@@ -4,6 +4,8 @@
  * proxy cannot reach the Python service.
  */
 
+import { sanitizeAiReport } from './aiTextSanitizer';
+
 const DIRECT_PYTHON_API_BASE = 'http://127.0.0.1:8765';
 const PYTHON_API_BASE_CANDIDATES = [
   '/pyapi',
@@ -154,7 +156,8 @@ async function postAiReport(path, body) {
         return { success: false, error: await parseErrorResponse(res) };
       }
 
-      return res.json();
+      const data = await res.json();
+      return data?.success ? { ...data, data: sanitizeAiReport(data.data) } : data;
     } catch (err) {
       const isRunning = await isPythonAiServiceRunning();
       return {

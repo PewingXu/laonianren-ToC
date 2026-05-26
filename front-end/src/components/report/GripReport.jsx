@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+﻿import React, { useState, useEffect, useRef, useMemo } from 'react';
 import * as echarts from 'echarts';
 import HandPressureMap from './HandPressureMap';
 import { exportToPdf } from '../../lib/pdfExport';
+import { sanitizeAiReport } from '../../lib/aiTextSanitizer';
 
 /* ─── ECharts 图表封装 (蔡司风格) ─── */
 function EChart({ option, height = 280 }) {
@@ -251,6 +252,7 @@ export default function GripReport({ patientName, patientInfo, onClose, reportDa
   const hasRight = rawReport?.right != null;
   const hasBothHands = hasLeft && hasRight;
   const gripAiPayload = useMemo(() => buildGripAiPayload(rawReport), [rawReport]);
+  const cleanAiReport = useMemo(() => sanitizeAiReport(aiReport), [aiReport]);
 
   useEffect(() => {
     onAiReportReadyRef.current = onAiReportReady;
@@ -701,27 +703,27 @@ export default function GripReport({ patientName, patientInfo, onClose, reportDa
                     <p className="text-sm" style={{ color: 'var(--text-muted)' }}>AI 分析暂不可用</p>
                     <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>{aiError}</p>
                   </div>
-                ) : aiReport ? (
+                ) : cleanAiReport ? (
                   <>
                     {/* 评估等级标签 */}
-                    {aiReport.eval_level && (
+                    {cleanAiReport.eval_level && (
                       <div className="flex items-center gap-3 mb-5 pb-4" style={{ borderBottom: '1px solid var(--border-light)' }}>
                         <div className="px-4 py-2 rounded-lg text-sm font-bold"
                           style={{
-                            background: aiReport.eval_level.text?.includes('正常') ? '#ECFDF5' : aiReport.eval_level.text?.includes('偏低') ? '#FFFBEB' : '#FEF2F2',
-                            color: aiReport.eval_level.text?.includes('正常') ? '#059669' : aiReport.eval_level.text?.includes('偏低') ? '#D97706' : '#DC2626',
+                            background: cleanAiReport.eval_level.text?.includes('正常') ? '#ECFDF5' : cleanAiReport.eval_level.text?.includes('偏低') ? '#FFFBEB' : '#FEF2F2',
+                            color: cleanAiReport.eval_level.text?.includes('正常') ? '#059669' : cleanAiReport.eval_level.text?.includes('偏低') ? '#D97706' : '#DC2626',
                           }}>
-                          评估等级: {aiReport.eval_level.text}
+                          评估等级: {cleanAiReport.eval_level.text}
                         </div>
                         <div className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                          {aiReport.eval_level.standard}
+                          {cleanAiReport.eval_level.standard}
                         </div>
                       </div>
                     )}
 
                     <div className="space-y-3">
                       {/* 数据质量提醒 */}
-                      {aiReport.data_quality && !aiReport.data_quality.is_valid && (
+                      {cleanAiReport.data_quality && !cleanAiReport.data_quality.is_valid && (
                         <div className="p-4 rounded-lg" style={{ background: '#FEF2F2', border: '1px solid #FECACA' }}>
                           <h5 className="text-xs font-bold mb-2 flex items-center gap-1.5" style={{ color: '#DC2626' }}>
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -729,9 +731,9 @@ export default function GripReport({ patientName, patientInfo, onClose, reportDa
                             </svg>
                             数据质量提醒
                           </h5>
-                          {aiReport.data_quality.issues?.length > 0 && (
+                          {cleanAiReport.data_quality.issues?.length > 0 && (
                             <ul className="text-sm leading-relaxed mb-2 space-y-1" style={{ color: '#991B1B' }}>
-                              {aiReport.data_quality.issues.map((issue, i) => (
+                              {cleanAiReport.data_quality.issues.map((issue, i) => (
                                 <li key={i} className="flex items-start gap-1.5">
                                   <span className="mt-1.5 w-1.5 h-1.5 rounded-full shrink-0" style={{ background: '#DC2626' }} />
                                   {issue}
@@ -739,85 +741,85 @@ export default function GripReport({ patientName, patientInfo, onClose, reportDa
                               ))}
                             </ul>
                           )}
-                          {aiReport.data_quality.suggestion && (
-                            <p className="text-sm font-medium" style={{ color: '#B91C1C' }}>{aiReport.data_quality.suggestion}</p>
+                          {cleanAiReport.data_quality.suggestion && (
+                            <p className="text-sm font-medium" style={{ color: '#B91C1C' }}>{cleanAiReport.data_quality.suggestion}</p>
                           )}
                         </div>
                       )}
 
                       {/* 测试概况 */}
-                      {aiReport.overview && (
+                      {cleanAiReport.overview && (
                         <div className="p-4 rounded-lg" style={{ background: 'var(--bg-hover, #f8f9fa)' }}>
                           <h5 className="font-bold mb-2" style={{ color: 'var(--text-primary)', fontSize: '14px' }}>测试概况</h5>
-                          <p className="text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>{aiReport.overview}</p>
+                          <p className="text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>{cleanAiReport.overview}</p>
                         </div>
                       )}
 
-                      {aiReport.left_hand_analysis && (
+                      {cleanAiReport.left_hand_analysis && (
                         <div className="p-4 rounded-lg" style={{ background: 'var(--bg-hover, #f8f9fa)' }}>
                           <h5 className="font-bold mb-2" style={{ color: 'var(--text-primary)', fontSize: '14px' }}>左手AI综合评估</h5>
-                          <p className="text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>{aiReport.left_hand_analysis}</p>
+                          <p className="text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>{cleanAiReport.left_hand_analysis}</p>
                         </div>
                       )}
 
-                      {aiReport.right_hand_analysis && (
+                      {cleanAiReport.right_hand_analysis && (
                         <div className="p-4 rounded-lg" style={{ background: 'var(--bg-hover, #f8f9fa)' }}>
                           <h5 className="font-bold mb-2" style={{ color: 'var(--text-primary)', fontSize: '14px' }}>右手AI综合评估</h5>
-                          <p className="text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>{aiReport.right_hand_analysis}</p>
+                          <p className="text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>{cleanAiReport.right_hand_analysis}</p>
                         </div>
                       )}
 
-                      {aiReport.bilateral_comparison && (
+                      {cleanAiReport.bilateral_comparison && (
                         <div className="p-4 rounded-lg" style={{ background: 'var(--bg-hover, #f8f9fa)' }}>
                           <h5 className="font-bold mb-2" style={{ color: 'var(--text-primary)', fontSize: '14px' }}>双手对比</h5>
-                          <p className="text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>{aiReport.bilateral_comparison}</p>
+                          <p className="text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>{cleanAiReport.bilateral_comparison}</p>
                         </div>
                       )}
 
                       {/* 握力水平分析 */}
-                      {aiReport.strength_analysis && (
+                      {cleanAiReport.strength_analysis && (
                         <div className="p-4 rounded-lg" style={{ background: 'var(--bg-hover, #f8f9fa)' }}>
                           <h5 className="font-bold mb-2" style={{ color: 'var(--text-primary)', fontSize: '14px' }}>握力水平分析</h5>
-                          <p className="text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>{aiReport.strength_analysis}</p>
+                          <p className="text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>{cleanAiReport.strength_analysis}</p>
                         </div>
                       )}
 
                       {/* 手指力分布分析 */}
-                      {aiReport.distribution_analysis && (
+                      {cleanAiReport.distribution_analysis && (
                         <div className="p-4 rounded-lg" style={{ background: 'var(--bg-hover, #f8f9fa)' }}>
                           <h5 className="font-bold mb-2" style={{ color: 'var(--text-primary)', fontSize: '14px' }}>手指力分布分析</h5>
-                          <p className="text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>{aiReport.distribution_analysis}</p>
+                          <p className="text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>{cleanAiReport.distribution_analysis}</p>
                         </div>
                       )}
 
                       {/* 稳定性分析 */}
-                      {aiReport.stability_analysis && (
+                      {cleanAiReport.stability_analysis && (
                         <div className="p-4 rounded-lg" style={{ background: 'var(--bg-hover, #f8f9fa)' }}>
                           <h5 className="font-bold mb-2" style={{ color: 'var(--text-primary)', fontSize: '14px' }}>手部稳定性分析</h5>
-                          <p className="text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>{aiReport.stability_analysis}</p>
+                          <p className="text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>{cleanAiReport.stability_analysis}</p>
                         </div>
                       )}
 
                       {/* 姿态分析 */}
-                      {aiReport.posture_analysis && (
+                      {cleanAiReport.posture_analysis && (
                         <div className="p-4 rounded-lg" style={{ background: 'var(--bg-hover, #f8f9fa)' }}>
                           <h5 className="font-bold mb-2" style={{ color: 'var(--text-primary)', fontSize: '14px' }}>握持姿态分析</h5>
-                          <p className="text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>{aiReport.posture_analysis}</p>
+                          <p className="text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>{cleanAiReport.posture_analysis}</p>
                         </div>
                       )}
 
                       {/* 临床建议 */}
-                      {aiReport.clinical_suggestion && (
+                      {cleanAiReport.clinical_suggestion && (
                         <div className="p-4 rounded-lg" style={{ background: 'var(--bg-hover, #f8f9fa)' }}>
                           <h5 className="font-bold mb-2" style={{ color: 'var(--text-primary)', fontSize: '14px' }}>临床建议</h5>
-                          <p className="text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>{aiReport.clinical_suggestion}</p>
+                          <p className="text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>{cleanAiReport.clinical_suggestion}</p>
                         </div>
                       )}
 
                       {/* 免责声明 */}
-                      {aiReport.disclaimer && (
+                      {cleanAiReport.disclaimer && (
                         <div className="text-center pt-3">
-                          <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{aiReport.disclaimer}</p>
+                          <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{cleanAiReport.disclaimer}</p>
                         </div>
                       )}
                     </div>
@@ -837,7 +839,6 @@ export default function GripReport({ patientName, patientInfo, onClose, reportDa
     </div>
   );
 }
-
 /* ─── 辅助组件 ─── */
 function SectionHeader({ title }) {
   return (

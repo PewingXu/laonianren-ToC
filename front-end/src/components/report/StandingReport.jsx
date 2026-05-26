@@ -745,7 +745,7 @@ export default function StandingReport({ reportData, patientInfo, onClose, onAiR
 
             {/* ═══════════ 区域压力分布 ═══════════ */}
             <section id="standing-pressure">
-              <SectionHeader title="区域压力分布" />
+              <SectionHeader title="区域压力分布" subtitle="Regional Pressure Distribution" />
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="zeiss-card p-4">
                   <div className="text-sm font-semibold mb-2" style={{ color: 'var(--text-primary)' }}>左脚区域压力</div>
@@ -919,7 +919,18 @@ function MetricCapsule({ index, label, leftVal, rightVal, leftExtra, rightExtra 
       </div>
       {/* 标签 */}
       <div className="flex-1 min-w-0">
-        <div className="font-semibold truncate" style={{ color: 'var(--text-primary)', fontSize: '14px' }}>{label}</div>
+        <div
+          className="font-semibold whitespace-nowrap"
+          style={{
+            color: 'var(--text-primary)',
+            fontSize: '14px',
+            lineHeight: 1.4,
+            paddingTop: '1px',
+            paddingBottom: '2px',
+          }}
+        >
+          {label}
+        </div>
         {leftExtra && (
           <div className="text-[10px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
             L: {leftExtra} {rightExtra ? `/ R: ${rightExtra}` : ''}

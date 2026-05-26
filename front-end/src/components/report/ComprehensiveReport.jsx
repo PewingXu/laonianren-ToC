@@ -35,31 +35,31 @@ function getArchType(ai) {
 }
 
 function evalGripLevel(totalForce, gender) {
-  // EWGSOP2 标准：男性 <27kg，女性 <16kg 为低握力
+  // AWGS 2019 / 社区筛查共识：男性 <28kg，女性 <18kg 提示低肌力
   // 这里用 N 做近似（1kg ≈ 9.8N）
   const kg = totalForce / 9.8;
   if (gender === '男') {
-    if (kg >= 27) return { text: '正常', color: C.green, bg: '#ECFDF5' };
-    if (kg >= 20) return { text: '偏低', color: C.amber, bg: '#FFFBEB' };
+    if (kg >= 28) return { text: '正常', color: C.green, bg: '#ECFDF5' };
+    if (kg >= 22) return { text: '偏低', color: C.amber, bg: '#FFFBEB' };
     return { text: '低握力', color: C.red, bg: '#FEF2F2' };
   }
-  if (kg >= 16) return { text: '正常', color: C.green, bg: '#ECFDF5' };
-  if (kg >= 12) return { text: '偏低', color: C.amber, bg: '#FFFBEB' };
+  if (kg >= 18) return { text: '正常', color: C.green, bg: '#ECFDF5' };
+  if (kg >= 14) return { text: '偏低', color: C.amber, bg: '#FFFBEB' };
   return { text: '低握力', color: C.red, bg: '#FEF2F2' };
 }
 
 function evalSitStandLevel(totalDur) {
   if (totalDur > 0 && totalDur < 12) return { text: '优秀', color: C.green, bg: '#ECFDF5' };
-  if (totalDur <= 15) return { text: '正常', color: C.cyan, bg: '#E0F7FA' };
+  if (totalDur <= 15) return { text: '需关注', color: C.amber, bg: '#FFFBEB' };
   if (totalDur <= 20) return { text: '偏慢', color: C.amber, bg: '#FFFBEB' };
-  return { text: '异常', color: C.red, bg: '#FEF2F2' };
+  return { text: '明显偏慢', color: C.red, bg: '#FEF2F2' };
 }
 
 function evalGaitLevel(walkSpeed) {
   if (walkSpeed >= 1.0) return { text: '正常', color: C.green, bg: '#ECFDF5' };
-  if (walkSpeed >= 0.8) return { text: '正常偏低', color: C.cyan, bg: '#E0F7FA' };
-  if (walkSpeed >= 0.6) return { text: '偏慢', color: C.amber, bg: '#FFFBEB' };
-  return { text: '异常', color: C.red, bg: '#FEF2F2' };
+  if (walkSpeed >= 0.45) return { text: '需关注', color: C.amber, bg: '#FFFBEB' };
+  if (walkSpeed > 0) return { text: '明显偏慢', color: C.red, bg: '#FEF2F2' };
+  return { text: '数据不足', color: C.blue, bg: '#E8F2FF' };
 }
 
 function evalStandingLevel(archIndex) {
@@ -153,9 +153,9 @@ function computeOverallRisk(grip, sitstand, standing, gait, gender) {
   if (grip) {
     const maxForce = Math.max(grip.leftTotalForce, grip.rightTotalForce);
     const kg = maxForce / 9.8;
-    const threshold = gender === '男' ? 27 : 16;
+    const threshold = gender === '男' ? 28 : 18;
     if (kg < threshold) {
-      findings.push({ text: `最大握力 ${kg.toFixed(1)} kg，低于 EWGSOP2 标准 (${threshold} kg)`, level: 'warning', category: '握力' });
+      findings.push({ text: `最大握力 ${kg.toFixed(1)} kg，低于 AWGS 2019 参考值 (${threshold} kg)`, level: 'warning', category: '握力' });
       riskScore += 25;
     } else {
       findings.push({ text: `最大握力 ${kg.toFixed(1)} kg，达标`, level: 'success', category: '握力' });
@@ -163,22 +163,24 @@ function computeOverallRisk(grip, sitstand, standing, gait, gender) {
   }
 
   if (sitstand) {
-    if (sitstand.totalDuration > 15) {
-      findings.push({ text: `五次起坐总时长 ${sitstand.totalDuration.toFixed(1)}s，超过 EWGSOP2 标准 (15s)`, level: 'warning', category: '起坐' });
+    if (sitstand.totalDuration >= 12) {
+      findings.push({ text: `五次起坐总时长 ${sitstand.totalDuration.toFixed(1)}s，达到需关注范围 (≥12s)`, level: 'warning', category: '起坐' });
       riskScore += 25;
     } else {
-      findings.push({ text: `五次起坐总时长 ${sitstand.totalDuration.toFixed(1)}s，达标 (<15s)`, level: 'success', category: '起坐' });
+      findings.push({ text: `五次起坐总时长 ${sitstand.totalDuration.toFixed(1)}s，达标 (<12s)`, level: 'success', category: '起坐' });
     }
   }
 
   if (gait) {
-    if (gait.walkingSpeed < 0.8) {
-      findings.push({ text: `行走速度 ${gait.walkingSpeed.toFixed(2)} m/s，低于正常参考值 (≥0.8 m/s)`, level: 'warning', category: '步态' });
+    if (gait.walkingSpeed > 0 && gait.walkingSpeed < 1.0) {
+      findings.push({ text: `行走速度 ${gait.walkingSpeed.toFixed(2)} m/s，低于 AWGS 2019 常用身体功能参考值 (≥1.0 m/s)`, level: 'warning', category: '步态' });
       riskScore += 25;
+    } else if (gait.walkingSpeed <= 0) {
+      findings.push({ text: '行走速度数据不足，建议结合原始步道数据复核', level: 'info', category: '步态' });
     } else {
-      findings.push({ text: `行走速度 ${gait.walkingSpeed.toFixed(2)} m/s，达标 (≥0.8 m/s)`, level: 'success', category: '步态' });
+      findings.push({ text: `行走速度 ${gait.walkingSpeed.toFixed(2)} m/s，达标 (≥1.0 m/s)`, level: 'success', category: '步态' });
     }
-    if (Math.abs(gait.leftStepTime - gait.rightStepTime) > 0.15) {
+    if (Math.abs(gait.leftStepTime - gait.rightStepTime) > 0.2) {
       findings.push({ text: `左右脚步长时间不对称 (差异 ${Math.abs(gait.leftStepTime - gait.rightStepTime).toFixed(3)}s)`, level: 'info', category: '步态' });
     }
   }
@@ -187,7 +189,7 @@ function computeOverallRisk(grip, sitstand, standing, gait, gender) {
     const leftType = getArchType(standing.leftArchIndex);
     const rightType = getArchType(standing.rightArchIndex);
     if (leftType !== '正常足弓' || rightType !== '正常足弓') {
-      findings.push({ text: `足弓异常：左脚${leftType}，右脚${rightType}`, level: 'info', category: '站立' });
+      findings.push({ text: `足弓需关注：左脚${leftType}，右脚${rightType}`, level: 'info', category: '站立' });
       riskScore += 10;
     } else {
       findings.push({ text: '双脚足弓形态正常', level: 'success', category: '站立' });
@@ -199,7 +201,7 @@ function computeOverallRisk(grip, sitstand, standing, gait, gender) {
   if (riskScore >= 50) {
     overallLevel = { text: '高风险', color: C.red, bg: '#FEF2F2', desc: '建议进一步进行 DXA 或 BIA 检查以确认肌少症诊断' };
   } else if (riskScore >= 25) {
-    overallLevel = { text: '中风险', color: C.amber, bg: '#FFFBEB', desc: '部分指标异常，建议定期复查并加强运动干预' };
+    overallLevel = { text: '中风险', color: C.amber, bg: '#FFFBEB', desc: '部分指标需关注，建议定期复查并加强运动干预' };
   } else {
     overallLevel = { text: '低风险', color: C.green, bg: '#ECFDF5', desc: '各项指标基本正常，建议保持良好的运动习惯' };
   }
@@ -215,15 +217,15 @@ function makeRadarOption(grip, sitstand, standing, gait, gender) {
   if (grip) {
     const maxForce = Math.max(grip.leftTotalForce, grip.rightTotalForce);
     const kg = maxForce / 9.8;
-    const threshold = gender === '男' ? 27 : 16;
+    const threshold = gender === '男' ? 28 : 18;
     indicators.push({ name: '握力', max: 100 });
     values.push(Math.min(100, (kg / threshold) * 80));
   }
 
   if (sitstand) {
     indicators.push({ name: '起坐能力', max: 100 });
-    // 15s 以下为正常，分数越高越好
-    const score = sitstand.totalDuration > 0 ? Math.max(0, Math.min(100, (1 - (sitstand.totalDuration - 8) / 20) * 100)) : 0;
+    // 12s 以下为正常参考，分数越高越好
+    const score = sitstand.totalDuration > 0 ? Math.max(0, Math.min(100, (1 - (sitstand.totalDuration - 8) / 16) * 100)) : 0;
     values.push(score);
   }
 
@@ -568,7 +570,7 @@ export default function ComprehensiveReport({ record, onClose }) {
                 )}
                 <div className="mt-3 p-3 rounded-lg text-xs" style={{ background: evalSitStandLevel(sitstandData.totalDuration).bg }}>
                   <span style={{ color: evalSitStandLevel(sitstandData.totalDuration).color }}>
-                    依据 EWGSOP2 标准，五次起坐测试 &lt;15s 为正常。受试者总时长 <b>{sitstandData.totalDuration.toFixed(1)}s</b>，
+                    依据 AWGS 2019 及社区筛查共识，五次起坐测试 ≥12s 提示身体功能需关注。总时长 <b>{sitstandData.totalDuration.toFixed(1)}s</b>，
                     评级为 <b>{evalSitStandLevel(sitstandData.totalDuration).text}</b>。
                   </span>
                 </div>
@@ -639,9 +641,9 @@ export default function ComprehensiveReport({ record, onClose }) {
                 <div className="p-3 rounded-lg text-xs" style={{ background: evalGaitLevel(gaitData.walkingSpeed).bg }}>
                   <span style={{ color: evalGaitLevel(gaitData.walkingSpeed).color }}>
                     行走速度 <b>{gaitData.walkingSpeed.toFixed(2)} m/s</b>，
-                    {gaitData.walkingSpeed >= 0.8 ? '达到正常参考值 (≥0.8 m/s)' : '低于正常参考值 (≥0.8 m/s)'}。
+                    {gaitData.walkingSpeed >= 1.0 ? '达到身体功能参考值 (≥1.0 m/s)' : gaitData.walkingSpeed > 0 ? '低于身体功能参考值 (≥1.0 m/s)，建议作为需关注项观察' : '暂未形成有效速度结果，建议复核步道数据'}。
                     左右脚步长时间差异 <b>{Math.abs(gaitData.leftStepTime - gaitData.rightStepTime).toFixed(3)}s</b>
-                    {Math.abs(gaitData.leftStepTime - gaitData.rightStepTime) <= 0.15 ? '，对称性良好' : '，存在不对称'}。
+                    {Math.abs(gaitData.leftStepTime - gaitData.rightStepTime) <= 0.2 ? '，对称性尚可' : '，存在不对称倾向'}。
                   </span>
                 </div>
               </div>
@@ -692,14 +694,14 @@ export default function ComprehensiveReport({ record, onClose }) {
                 ))}
               </div>
 
-              {/* EWGSOP2 标准说明 */}
+              {/* AWGS / 社区筛查标准说明 */}
               <div className="p-4 rounded-lg" style={{ background: 'var(--bg-tertiary)', border: '1px solid var(--border-light)' }}>
-                <h6 className="text-xs font-semibold mb-2" style={{ color: 'var(--text-primary)' }}>参考标准 (EWGSOP2)</h6>
+                <h6 className="text-xs font-semibold mb-2" style={{ color: 'var(--text-primary)' }}>参考标准 (AWGS 2019 / 社区筛查共识)</h6>
                 <div className="text-[11px] leading-relaxed space-y-1" style={{ color: 'var(--text-secondary)' }}>
-                  <p>本报告依据欧洲老年人肌少症工作组 (EWGSOP2) 2019 年修订标准进行综合评估：</p>
-                  <p>1. <b>握力</b>：男性 &lt;27kg / 女性 &lt;16kg 提示低肌力</p>
-                  <p>2. <b>五次起坐测试</b>：&gt;15 秒提示下肢肌力不足</p>
-                  <p>3. <b>步态速度</b>：&lt;0.8 m/s 提示肌肉功能下降</p>
+                  <p>本报告依据 AWGS 2019 及社区老年人肌肉减少症筛查专家共识进行早筛参考：</p>
+                  <p>1. <b>握力</b>：男性 &lt;28kg / 女性 &lt;18kg 提示低肌力</p>
+                  <p>2. <b>五次起坐测试</b>：≥12 秒提示身体功能下降</p>
+                  <p>3. <b>步态速度</b>：&lt;1.0 m/s 提示身体功能下降，需结合完整步道数据综合判断</p>
                   <p>4. <b>足弓指数</b>：正常范围 0.21-0.26，异常可能影响平衡和步态</p>
                   <p className="mt-2 font-medium" style={{ color: 'var(--text-muted)' }}>注：本报告仅供参考，最终诊断请结合临床医生意见。</p>
                 </div>
