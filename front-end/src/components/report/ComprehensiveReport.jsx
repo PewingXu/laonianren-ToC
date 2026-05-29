@@ -1,6 +1,8 @@
 import React, { useRef, useState, useMemo } from 'react';
 import ReactECharts from 'echarts-for-react';
 import { exportToPdf } from '../../lib/pdfExport';
+import ReportSummaryCard, { BasisNote } from './ReportSummaryCard';
+import { buildComprehensiveScoreResult } from '../../lib/assessmentScoring';
 
 /**
  * 综合评估报告组件
@@ -145,70 +147,6 @@ function extractGaitSummary(reportData) {
   };
 }
 
-/* ─── 综合风险评估 ─── */
-function computeOverallRisk(grip, sitstand, standing, gait, gender) {
-  const findings = [];
-  let riskScore = 0; // 0-100, higher = more risk
-
-  if (grip) {
-    const maxForce = Math.max(grip.leftTotalForce, grip.rightTotalForce);
-    const kg = maxForce / 9.8;
-    const threshold = gender === '男' ? 28 : 18;
-    if (kg < threshold) {
-      findings.push({ text: `最大握力 ${kg.toFixed(1)} kg，低于 AWGS 2019 参考值 (${threshold} kg)`, level: 'warning', category: '握力' });
-      riskScore += 25;
-    } else {
-      findings.push({ text: `最大握力 ${kg.toFixed(1)} kg，达标`, level: 'success', category: '握力' });
-    }
-  }
-
-  if (sitstand) {
-    if (sitstand.totalDuration >= 12) {
-      findings.push({ text: `五次起坐总时长 ${sitstand.totalDuration.toFixed(1)}s，达到需关注范围 (≥12s)`, level: 'warning', category: '起坐' });
-      riskScore += 25;
-    } else {
-      findings.push({ text: `五次起坐总时长 ${sitstand.totalDuration.toFixed(1)}s，达标 (<12s)`, level: 'success', category: '起坐' });
-    }
-  }
-
-  if (gait) {
-    if (gait.walkingSpeed > 0 && gait.walkingSpeed < 1.0) {
-      findings.push({ text: `行走速度 ${gait.walkingSpeed.toFixed(2)} m/s，低于 AWGS 2019 常用身体功能参考值 (≥1.0 m/s)`, level: 'warning', category: '步态' });
-      riskScore += 25;
-    } else if (gait.walkingSpeed <= 0) {
-      findings.push({ text: '行走速度数据不足，建议结合原始步道数据复核', level: 'info', category: '步态' });
-    } else {
-      findings.push({ text: `行走速度 ${gait.walkingSpeed.toFixed(2)} m/s，达标 (≥1.0 m/s)`, level: 'success', category: '步态' });
-    }
-    if (Math.abs(gait.leftStepTime - gait.rightStepTime) > 0.2) {
-      findings.push({ text: `左右脚步长时间不对称 (差异 ${Math.abs(gait.leftStepTime - gait.rightStepTime).toFixed(3)}s)`, level: 'info', category: '步态' });
-    }
-  }
-
-  if (standing) {
-    const leftType = getArchType(standing.leftArchIndex);
-    const rightType = getArchType(standing.rightArchIndex);
-    if (leftType !== '正常足弓' || rightType !== '正常足弓') {
-      findings.push({ text: `足弓需关注：左脚${leftType}，右脚${rightType}`, level: 'info', category: '站立' });
-      riskScore += 10;
-    } else {
-      findings.push({ text: '双脚足弓形态正常', level: 'success', category: '站立' });
-    }
-  }
-
-  // 综合肌少症风险判定
-  let overallLevel;
-  if (riskScore >= 50) {
-    overallLevel = { text: '高风险', color: C.red, bg: '#FEF2F2', desc: '建议进一步进行 DXA 或 BIA 检查以确认肌少症诊断' };
-  } else if (riskScore >= 25) {
-    overallLevel = { text: '中风险', color: C.amber, bg: '#FFFBEB', desc: '部分指标需关注，建议定期复查并加强运动干预' };
-  } else {
-    overallLevel = { text: '低风险', color: C.green, bg: '#ECFDF5', desc: '各项指标基本正常，建议保持良好的运动习惯' };
-  }
-
-  return { findings, riskScore, overallLevel };
-}
-
 /* ─── 雷达图配置 ─── */
 function makeRadarOption(grip, sitstand, standing, gait, gender) {
   const indicators = [];
@@ -317,9 +255,15 @@ export default function ComprehensiveReport({ record, onClose }) {
   const standingData = useMemo(() => extractStandingSummary(assessments.standing?.report?.reportData), [assessments]);
   const gaitData = useMemo(() => extractGaitSummary(assessments.gait?.report?.reportData), [assessments]);
 
-  // 综合风险评估
-  const risk = useMemo(() => computeOverallRisk(gripData, sitstandData, standingData, gaitData, patientInfo.gender), [gripData, sitstandData, standingData, gaitData, patientInfo.gender]);
-
+  // 综合评分评估
+  const comprehensiveScore = useMemo(
+    () => buildComprehensiveScoreResult(assessments, patientInfo),
+    [assessments, patientInfo],
+  );
+  const itemScoreMap = useMemo(
+    () => Object.fromEntries((comprehensiveScore.itemResults || []).map(item => [item.type, item])),
+    [comprehensiveScore],
+  );
   // 雷达图
   const radarOption = useMemo(() => makeRadarOption(gripData, sitstandData, standingData, gaitData, patientInfo.gender), [gripData, sitstandData, standingData, gaitData, patientInfo.gender]);
 
@@ -329,7 +273,6 @@ export default function ComprehensiveReport({ record, onClose }) {
     ...(sitstandData ? [{ id: 'sitstand', title: '起坐评估' }] : []),
     ...(standingData ? [{ id: 'standing', title: '站立评估' }] : []),
     ...(gaitData ? [{ id: 'gait', title: '步态评估' }] : []),
-    { id: 'conclusion', title: '综合结论' },
   ];
 
   const scrollToSection = (id) => {
@@ -410,8 +353,13 @@ export default function ComprehensiveReport({ record, onClose }) {
           <section id="comp-overview">
             <div className="zeiss-section-title">综合概览</div>
 
+            <ReportSummaryCard
+              scoreResult={comprehensiveScore}
+              title="综合得分"
+            />
+
             {/* 患者信息 + 风险等级 */}
-            <div className="zeiss-card p-5 mb-4">
+            <div className="zeiss-card p-5 my-4">
               <div className="flex flex-col md:flex-row md:items-start gap-6">
                 {/* 患者信息 */}
                 <div className="flex-1">
@@ -448,10 +396,10 @@ export default function ComprehensiveReport({ record, onClose }) {
 
                 {/* 风险等级 */}
                 <div className="w-full md:w-64 shrink-0">
-                  <div className="p-5 rounded-xl text-center" style={{ background: risk.overallLevel.bg, border: `2px solid ${risk.overallLevel.color}30` }}>
-                    <div className="text-xs font-medium mb-2" style={{ color: 'var(--text-muted)' }}>肌少症风险评级</div>
-                    <div className="text-3xl font-black mb-1" style={{ color: risk.overallLevel.color }}>{risk.overallLevel.text}</div>
-                    <div className="text-[11px] leading-relaxed" style={{ color: risk.overallLevel.color }}>{risk.overallLevel.desc}</div>
+                  <div className="p-5 rounded-xl text-center" style={{ background: comprehensiveScore.bg, border: `2px solid ${comprehensiveScore.color}30` }}>
+                    <div className="text-xs font-medium mb-2" style={{ color: 'var(--text-muted)' }}>综合等级</div>
+                    <div className="text-3xl font-black mb-1" style={{ color: comprehensiveScore.color }}>{comprehensiveScore.level}</div>
+                    <div className="text-[11px] leading-relaxed" style={{ color: comprehensiveScore.color }}>{comprehensiveScore.levelDesc}</div>
                   </div>
                 </div>
               </div>
@@ -493,9 +441,15 @@ export default function ComprehensiveReport({ record, onClose }) {
             <section id="comp-grip">
               <div className="zeiss-section-title">握力评估摘要</div>
               <div className="zeiss-card p-5">
+                {itemScoreMap.grip && (
+                  <div className="mb-4 p-3 rounded-lg text-xs font-semibold"
+                    style={{ background: itemScoreMap.grip.bg, color: itemScoreMap.grip.color }}>
+                    握力评分：{itemScoreMap.grip.score}/25 · {itemScoreMap.grip.level}
+                  </div>
+                )}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
                   <MetricCard label="左手总握力" value={(gripData.leftTotalForce).toFixed(1)} unit="N" color={C.blue}
-                    sub={evalGripLevel(gripData.leftTotalForce, patientInfo.gender).text} />
+                    sub={itemScoreMap.grip ? `${itemScoreMap.grip.score}/25` : evalGripLevel(gripData.leftTotalForce, patientInfo.gender).text} />
                   <MetricCard label="右手总握力" value={(gripData.rightTotalForce).toFixed(1)} unit="N" color={C.cyan}
                     sub={evalGripLevel(gripData.rightTotalForce, patientInfo.gender).text} />
                   <MetricCard label="最大握力" value={Math.max(gripData.leftTotalForce, gripData.rightTotalForce).toFixed(1)} unit="N" color={C.green} />
@@ -542,6 +496,12 @@ export default function ComprehensiveReport({ record, onClose }) {
             <section id="comp-sitstand">
               <div className="zeiss-section-title">五次起坐评估摘要</div>
               <div className="zeiss-card p-5">
+                {itemScoreMap.sitstand && (
+                  <div className="mb-4 p-3 rounded-lg text-xs font-semibold"
+                    style={{ background: itemScoreMap.sitstand.bg, color: itemScoreMap.sitstand.color }}>
+                    起坐评分：{itemScoreMap.sitstand.score}/25 · {itemScoreMap.sitstand.level}
+                  </div>
+                )}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
                   <MetricCard label="总时长" value={sitstandData.totalDuration.toFixed(1)} unit="s" color={C.blue}
                     sub={evalSitStandLevel(sitstandData.totalDuration).text} />
@@ -583,6 +543,12 @@ export default function ComprehensiveReport({ record, onClose }) {
             <section id="comp-standing">
               <div className="zeiss-section-title">静态站立评估摘要</div>
               <div className="zeiss-card p-5">
+                {itemScoreMap.standing && (
+                  <div className="mb-4 p-3 rounded-lg text-xs font-semibold"
+                    style={{ background: itemScoreMap.standing.bg, color: itemScoreMap.standing.color }}>
+                    静态站立评分：{itemScoreMap.standing.score}/25 · {itemScoreMap.standing.level}
+                  </div>
+                )}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
                   <MetricCard label="左脚足弓指数" value={standingData.leftArchIndex?.toFixed(3) || '-'} unit="" color={C.blue}
                     sub={getArchType(standingData.leftArchIndex)} />
@@ -624,6 +590,12 @@ export default function ComprehensiveReport({ record, onClose }) {
             <section id="comp-gait">
               <div className="zeiss-section-title">行走步态评估摘要</div>
               <div className="zeiss-card p-5">
+                {itemScoreMap.gait && (
+                  <div className="mb-4 p-3 rounded-lg text-xs font-semibold"
+                    style={{ background: itemScoreMap.gait.bg, color: itemScoreMap.gait.color }}>
+                    步态评分：{itemScoreMap.gait.score}/25 · {itemScoreMap.gait.level}
+                  </div>
+                )}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
                   <MetricCard label="行走速度" value={gaitData.walkingSpeed.toFixed(2)} unit="m/s" color={C.blue}
                     sub={evalGaitLevel(gaitData.walkingSpeed).text} />
@@ -650,67 +622,9 @@ export default function ComprehensiveReport({ record, onClose }) {
             </section>
           )}
 
-          {/* ═══ 6. 综合结论 ═══ */}
-          <section id="comp-conclusion">
-            <div className="zeiss-section-title">综合结论与建议</div>
-            <div className="zeiss-card p-5">
-              {/* 风险评级 */}
-              <div className="flex items-center gap-4 mb-5 p-4 rounded-xl" style={{ background: risk.overallLevel.bg, border: `1px solid ${risk.overallLevel.color}20` }}>
-                <div className="w-16 h-16 rounded-full flex items-center justify-center shrink-0" style={{ background: risk.overallLevel.color + '20' }}>
-                  <span className="text-2xl font-black" style={{ color: risk.overallLevel.color }}>
-                    {risk.riskScore}
-                  </span>
-                </div>
-                <div>
-                  <div className="text-lg font-bold" style={{ color: risk.overallLevel.color }}>
-                    肌少症风险评级：{risk.overallLevel.text}
-                  </div>
-                  <div className="text-sm mt-1" style={{ color: risk.overallLevel.color }}>
-                    {risk.overallLevel.desc}
-                  </div>
-                </div>
-              </div>
-
-              {/* 各项发现 */}
-              <h5 className="text-sm font-semibold mb-3" style={{ color: 'var(--text-primary)' }}>评估发现</h5>
-              <div className="space-y-2 mb-5">
-                {risk.findings.map((f, i) => (
-                  <div key={i} className="flex items-start gap-2 p-2.5 rounded-lg text-xs"
-                    style={{
-                      background: f.level === 'warning' ? '#FEF3C7' : f.level === 'success' ? '#ECFDF5' : '#EFF6FF',
-                      color: f.level === 'warning' ? '#92400E' : f.level === 'success' ? '#065F46' : '#1E40AF',
-                    }}>
-                    <svg className="w-4 h-4 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      {f.level === 'warning' ? (
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z" />
-                      ) : f.level === 'success' ? (
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      ) : (
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      )}
-                    </svg>
-                    <span><b>[{f.category}]</b> {f.text}</span>
-                  </div>
-                ))}
-              </div>
-
-              {/* AWGS / 社区筛查标准说明 */}
-              <div className="p-4 rounded-lg" style={{ background: 'var(--bg-tertiary)', border: '1px solid var(--border-light)' }}>
-                <h6 className="text-xs font-semibold mb-2" style={{ color: 'var(--text-primary)' }}>参考标准 (AWGS 2019 / 社区筛查共识)</h6>
-                <div className="text-[11px] leading-relaxed space-y-1" style={{ color: 'var(--text-secondary)' }}>
-                  <p>本报告依据 AWGS 2019 及社区老年人肌肉减少症筛查专家共识进行早筛参考：</p>
-                  <p>1. <b>握力</b>：男性 &lt;28kg / 女性 &lt;18kg 提示低肌力</p>
-                  <p>2. <b>五次起坐测试</b>：≥12 秒提示身体功能下降</p>
-                  <p>3. <b>步态速度</b>：&lt;1.0 m/s 提示身体功能下降，需结合完整步道数据综合判断</p>
-                  <p>4. <b>足弓指数</b>：正常范围 0.21-0.26，异常可能影响平衡和步态</p>
-                  <p className="mt-2 font-medium" style={{ color: 'var(--text-muted)' }}>注：本报告仅供参考，最终诊断请结合临床医生意见。</p>
-                </div>
-              </div>
-            </div>
-          </section>
-
           {/* 页脚 */}
           <div className="text-center py-4 text-[10px]" style={{ color: 'var(--text-muted)' }}>
+            <BasisNote className="mb-2" />
             <p>肌少症/老年人评估及监测系统 · 综合评估报告</p>
             <p>powered by 矩侨工业</p>
           </div>

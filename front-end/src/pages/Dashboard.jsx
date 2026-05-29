@@ -1,6 +1,8 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAssessment } from '../contexts/AssessmentContext';
+import ComprehensiveReport from '../components/report/ComprehensiveReport';
+import { buildComprehensiveScoreResult } from '../lib/assessmentScoring';
 
 /* ─── 评估项目配置 ─── */
 const ASSESSMENTS = [
@@ -263,6 +265,7 @@ export default function Dashboard() {
   const [gripTipPath, setGripTipPath] = useState('');
   const [showSitStandTip, setShowSitStandTip] = useState(false);
   const [sitStandTipPath, setSitStandTipPath] = useState('');
+  const [showComprehensiveReport, setShowComprehensiveReport] = useState(false);
 
   const handleStart = (path) => {
     if (patientInfo) {
@@ -306,6 +309,28 @@ export default function Dashboard() {
   };
 
   const completedCount = Object.values(assessments).filter(a => a.completed).length;
+  const comprehensiveReady = completedCount === 4;
+  const currentRecord = useMemo(() => {
+    if (!patientInfo) return null;
+    const now = new Date();
+    return {
+      id: 'current-session',
+      sessionId: 'current-session',
+      patientName: patientInfo.name,
+      patientGender: patientInfo.gender,
+      patientAge: patientInfo.age,
+      patientWeight: patientInfo.weight,
+      institution: institution || '',
+      assessments,
+      date: now.toISOString(),
+      dateStr: `${now.getFullYear()}/${String(now.getMonth() + 1).padStart(2, '0')}/${String(now.getDate()).padStart(2, '0')}`,
+      updatedAt: now.toISOString(),
+    };
+  }, [patientInfo, institution, assessments]);
+  const comprehensiveScore = useMemo(
+    () => currentRecord ? buildComprehensiveScoreResult(assessments, patientInfo || {}) : null,
+    [currentRecord, assessments, patientInfo],
+  );
 
   return (
     <div className="h-screen w-screen flex flex-col overflow-hidden" style={{ background: 'var(--bg-primary)' }}>
@@ -409,6 +434,45 @@ export default function Dashboard() {
             </button>
           )}
         </div>
+
+        <button
+          type="button"
+          onClick={() => comprehensiveReady && setShowComprehensiveReport(true)}
+          disabled={!comprehensiveReady}
+          className="mb-5 md:mb-7 w-full max-w-[520px] rounded-xl px-5 py-4 transition-all animate-slideUp"
+          style={{
+            background: comprehensiveReady ? 'var(--bg-secondary)' : '#EEF1F5',
+            color: comprehensiveReady ? 'var(--text-primary)' : 'var(--text-muted)',
+            border: comprehensiveReady ? '1px solid rgba(0,102,204,0.22)' : '1px solid var(--border-light)',
+            boxShadow: comprehensiveReady ? '0 8px 24px rgba(0,102,204,0.08)' : 'none',
+            cursor: comprehensiveReady ? 'pointer' : 'not-allowed',
+            opacity: comprehensiveReady ? 1 : 0.72,
+          }}
+        >
+          <div className="flex items-center justify-between gap-4">
+            <div className="text-left">
+              <div className="text-sm font-bold">综合评分报告</div>
+              <div className="text-xs mt-1" style={{ color: comprehensiveReady ? 'var(--text-tertiary)' : 'var(--text-muted)' }}>
+                {comprehensiveReady ? '四项评估已完成，可以生成总评分报告' : `完成四项评估后启用，目前 ${completedCount}/4`}
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              {comprehensiveReady && comprehensiveScore && (
+                <div className="text-right">
+                  <div className="text-2xl font-black tabular-nums" style={{ color: comprehensiveScore.color }}>
+                    {comprehensiveScore.score}
+                    <span className="text-xs font-bold ml-0.5">/100</span>
+                  </div>
+                  <div className="text-[10px] font-semibold" style={{ color: comprehensiveScore.color }}>{comprehensiveScore.level}</div>
+                </div>
+              )}
+              <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                style={{ color: comprehensiveReady ? 'var(--zeiss-blue)' : 'var(--text-muted)' }}>
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </div>
+          </div>
+        </button>
 
         {/* 四个评估卡片 */}
         <div className="dashboard-grid px-2">
@@ -612,6 +676,12 @@ export default function Dashboard() {
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {showComprehensiveReport && currentRecord && (
+        <div className="fixed inset-0 z-40" style={{ background: 'var(--bg-primary)' }}>
+          <ComprehensiveReport record={currentRecord} onClose={() => setShowComprehensiveReport(false)} />
         </div>
       )}
     </div>

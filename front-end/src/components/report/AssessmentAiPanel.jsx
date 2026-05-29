@@ -16,6 +16,7 @@ export default function AssessmentAiPanel({
   aiError,
   aiReport,
   sections = [],
+  excludeKeys = [],
   loadingText = 'AI 正在分析评估数据...',
   emptyText = '暂无 AI 分析数据',
 }) {
@@ -51,7 +52,8 @@ export default function AssessmentAiPanel({
   }
 
   const cleanReport = sanitizeAiReport(aiReport);
-  const visibleSections = sections.filter(section => cleanReport[section.key]);
+  const excludedSectionKeys = new Set(excludeKeys);
+  const visibleSections = sections.filter(section => !excludedSectionKeys.has(section.key) && cleanReport[section.key]);
 
   return (
     <>

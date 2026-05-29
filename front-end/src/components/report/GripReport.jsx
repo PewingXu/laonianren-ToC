@@ -3,6 +3,8 @@ import * as echarts from 'echarts';
 import HandPressureMap from './HandPressureMap';
 import { exportToPdf } from '../../lib/pdfExport';
 import { sanitizeAiReport } from '../../lib/aiTextSanitizer';
+import ReportSummaryCard, { BasisNote } from './ReportSummaryCard';
+import { scoreGrip, scoreToAiContext } from '../../lib/assessmentScoring';
 
 /* ─── ECharts 图表封装 (蔡司风格) ─── */
 function EChart({ option, height = 280 }) {
@@ -30,7 +32,7 @@ const SECTIONS = [
   { id: 'angular', label: '抖动检测' },
   { id: 'time-analysis', label: '时间分析' },
   { id: 'peak-data', label: '峰值帧数据' },
-  { id: 'ai-assessment', label: 'AI综合评估' },
+  { id: 'ai-assessment', label: 'AI分项分析' },
 ];
 
 /* ─── 默认空 fingers 数据（防止 undefined 崩溃）─── */
@@ -74,6 +76,131 @@ function roundMetric(value, digits = 2, fallback = null) {
   return Number(value.toFixed(digits));
 }
 
+function toFiniteNumber(value, fallback = null) {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'string') {
+    const match = value.match(/-?\d+(?:\.\d+)?/);
+    if (match) {
+      const num = Number(match[0]);
+      if (Number.isFinite(num)) return num;
+    }
+  }
+  return fallback;
+}
+
+function parseTimeAnalysisNumber(timeAnalysis, labels) {
+  if (!Array.isArray(timeAnalysis)) return null;
+  const normalizedLabels = labels.map(label => String(label).toLowerCase());
+  const row = timeAnalysis.find(item => {
+    const label = String(item?.label || '').toLowerCase();
+    return normalizedLabels.some(target => label === target || label.includes(target));
+  });
+  return toFiniteNumber(row?.value, null);
+}
+
+function normalizeTimeAnalysisRows(timeAnalysis = []) {
+  const labelMap = {
+    '抓握开始时间': '开始发力时刻',
+    'Grip Start': '开始发力时刻',
+    'Peak Time': '峰值力时间',
+    'Time To Peak': '到达峰值耗时',
+    'Peak Force': '峰值力',
+    'Shake Threshold': '检测阈值',
+    'Shake Count': '抖动次数',
+    'Avg Angular Velocity': '平均角速度',
+    'Max Angular Velocity': '最大角速度',
+  };
+  return (timeAnalysis || []).map(row => ({
+    ...row,
+    label: labelMap[row?.label] || row?.label,
+  }));
+}
+
+function deriveGripTimingFromSeries(handData) {
+  const times = Array.isArray(handData?.times) ? handData.times : [];
+  const forces = Array.isArray(handData?.forceTimeSeries?.total) ? handData.forceTimeSeries.total : [];
+  const n = Math.min(times.length, forces.length);
+  if (!n) return {};
+
+  const numericTimes = times.slice(0, n).map(value => toFiniteNumber(value, null));
+  const numericForces = forces.slice(0, n).map(value => toFiniteNumber(value, null));
+  const validForces = numericForces.filter(value => value != null);
+  if (!validForces.length) return {};
+
+  const peakForce = Math.max(...validForces);
+  if (!Number.isFinite(peakForce) || peakForce <= 0) return {};
+
+  let peakIdx = 0;
+  for (let i = 0; i < n; i += 1) {
+    if ((numericForces[i] ?? -Infinity) >= (numericForces[peakIdx] ?? -Infinity)) {
+      peakIdx = i;
+    }
+  }
+
+  const gripThreshold = peakForce * 0.1;
+  let gripStartIdx = -1;
+  let gripEndIdx = -1;
+  for (let i = 0; i < n; i += 1) {
+    if ((numericForces[i] ?? 0) > gripThreshold) {
+      if (gripStartIdx < 0) gripStartIdx = i;
+      gripEndIdx = i;
+    }
+  }
+
+  const peakThreshold = peakForce * 0.95;
+  let peakStartIdx = peakIdx;
+  let peakEndIdx = peakIdx;
+  while (peakStartIdx > 0 && (numericForces[peakStartIdx - 1] ?? 0) >= peakThreshold) {
+    peakStartIdx -= 1;
+  }
+  while (peakEndIdx < n - 1 && (numericForces[peakEndIdx + 1] ?? 0) >= peakThreshold) {
+    peakEndIdx += 1;
+  }
+
+  const gripStartTime = gripStartIdx >= 0 ? numericTimes[gripStartIdx] : null;
+  const gripEndTime = gripEndIdx >= 0 ? numericTimes[gripEndIdx] : null;
+  const peakStartTime = numericTimes[peakStartIdx];
+  const peakEndTime = numericTimes[peakEndIdx];
+
+  return {
+    gripStartTime,
+    gripEndTime,
+    gripDuration: gripStartTime != null && gripEndTime != null ? Math.max(0, gripEndTime - gripStartTime) : null,
+    peakTime: numericTimes[peakIdx],
+    peakDuration: peakStartTime != null && peakEndTime != null ? Math.max(0, peakEndTime - peakStartTime) : null,
+    peakStartTime,
+    peakEndTime,
+  };
+}
+
+function buildDisplayTimeAnalysis(handData, derivedTiming = deriveGripTimingFromSeries(handData)) {
+  const rows = normalizeTimeAnalysisRows(handData?.timeAnalysis || []);
+  const hasLabel = (label) => rows.some(row => row?.label === label);
+  const formatSeconds = value => `${Number(value).toFixed(3)} s`;
+
+  const startTime = toFiniteNumber(handData?.gripStartTime, derivedTiming.gripStartTime ?? null);
+  const endTime = toFiniteNumber(handData?.gripEndTime, derivedTiming.gripEndTime ?? null);
+  const gripDuration = toFiniteNumber(handData?.gripDuration, derivedTiming.gripDuration ?? null);
+  const peakDuration = toFiniteNumber(handData?.peakInfo?.duration, derivedTiming.peakDuration ?? null);
+
+  if (!hasLabel('开始发力时刻') && startTime != null) {
+    rows.unshift({ label: '开始发力时刻', value: formatSeconds(startTime) });
+  }
+
+  const insertAfterStart = rows.findIndex(row => row?.label === '开始发力时刻') + 1 || 1;
+  if (!hasLabel('结束发力时刻') && endTime != null) {
+    rows.splice(insertAfterStart, 0, { label: '结束发力时刻', value: formatSeconds(endTime) });
+  }
+  if (!hasLabel('有效抓握时长') && gripDuration != null) {
+    rows.splice(insertAfterStart + (hasLabel('结束发力时刻') ? 1 : 0), 0, { label: '有效抓握时长', value: formatSeconds(gripDuration) });
+  }
+  if (!hasLabel('峰值持续时间') && peakDuration != null) {
+    rows.push({ label: '峰值持续时间', value: formatSeconds(peakDuration) });
+  }
+
+  return rows;
+}
+
 function buildRangeSummary(values) {
   if (!Array.isArray(values) || values.length === 0) return null;
   const numericValues = values.filter(value => typeof value === 'number' && Number.isFinite(value));
@@ -87,9 +214,36 @@ function buildRangeSummary(values) {
 function buildGripHandAiPayload(handData, fallbackLabel) {
   if (!handData) return null;
 
+  const derivedTiming = deriveGripTimingFromSeries(handData);
   const peakForce = roundMetric(handData.peakInfo?.peak_force ?? 0, 2, 0);
-  const peakTime = roundMetric(handData.peakInfo?.peak_time ?? 0, 3, null);
-  const gripStartTime = roundMetric(handData.gripStartTime ?? 0, 3, null);
+  const peakTime = roundMetric(
+    toFiniteNumber(handData.peakInfo?.peak_time, parseTimeAnalysisNumber(handData.timeAnalysis, ['峰值力时间', 'Peak Time']) ?? derivedTiming.peakTime),
+    3,
+    null,
+  );
+  const gripStartTime = roundMetric(
+    toFiniteNumber(handData.gripStartTime, parseTimeAnalysisNumber(handData.timeAnalysis, ['开始发力时刻', '抓握开始时间', 'Grip Start']) ?? derivedTiming.gripStartTime),
+    3,
+    null,
+  );
+  const gripDuration = roundMetric(
+    toFiniteNumber(handData.gripDuration, parseTimeAnalysisNumber(handData.timeAnalysis, ['有效抓握时长']) ?? derivedTiming.gripDuration),
+    3,
+    null,
+  );
+  const timeToPeak = roundMetric(
+    toFiniteNumber(
+      parseTimeAnalysisNumber(handData.timeAnalysis, ['到达峰值耗时', 'Time To Peak']),
+      peakTime != null && gripStartTime != null ? peakTime - gripStartTime : null,
+    ),
+    3,
+    null,
+  );
+  const peakDuration = roundMetric(
+    toFiniteNumber(handData.peakInfo?.duration, parseTimeAnalysisNumber(handData.timeAnalysis, ['峰值持续时间']) ?? derivedTiming.peakDuration),
+    3,
+    null,
+  );
 
   return {
     hand_type: handData.handType || handData.hand || fallbackLabel,
@@ -107,9 +261,10 @@ function buildGripHandAiPayload(handData, fallbackLabel) {
       points: finger.points ?? '-',
     })),
     grip_start_time: gripStartTime,
-    time_to_peak: roundMetric((peakTime ?? 0) - (gripStartTime ?? 0), 3, null),
+    grip_duration: gripDuration,
+    time_to_peak: timeToPeak,
     peak_time: peakTime,
-    peak_duration: roundMetric(handData.peakInfo?.duration ?? 0, 3, null),
+    peak_duration: peakDuration,
     shake_count: handData.shakeCount ?? 0,
     avg_angular_velocity: roundMetric(handData.avgAngularVelocity ?? 0, 2, 0),
     max_angular_velocity: roundMetric(handData.maxAngularVelocity ?? 0, 2, 0),
@@ -186,6 +341,35 @@ function buildGripAiPayload(rawReport) {
   };
 }
 
+function flattenAiReportText(aiReport) {
+  if (!aiReport) return '';
+  if (typeof aiReport === 'string') return aiReport;
+  if (Array.isArray(aiReport)) return aiReport.map(flattenAiReportText).join('\n');
+  if (typeof aiReport === 'object') {
+    return Object.values(aiReport).map(flattenAiReportText).join('\n');
+  }
+  return '';
+}
+
+function hasStaleGripTimingText(aiReport) {
+  const text = flattenAiReportText(aiReport);
+  return /(?:抓握(?:持续)?时间|峰值(?:平台)?持续时间)[^。；;\n]{0,18}0(?:\.0+)?\s*秒/.test(text);
+}
+
+function isGripAiReportCompatible(aiReport, scoreResult, options = {}) {
+  if (!aiReport || !scoreResult) return true;
+  const overview = typeof aiReport.overview === 'string' ? aiReport.overview : '';
+  const maxScore = scoreResult.maxScore || 25;
+  const scoreMatch = overview.match(/(?:得分|评分|项目评分|综合得分)[^\d]{0,12}(\d+(?:\.\d+)?)\s*分/);
+  if (scoreMatch && Number(scoreMatch[1]) > maxScore) {
+    return false;
+  }
+  if (options.rejectStaleTimingText && hasStaleGripTimingText(aiReport)) {
+    return false;
+  }
+  return true;
+}
+
 /* ─── 主报告组件 ─── */
 export default function GripReport({ patientName, patientInfo, onClose, reportData: propsReportData, onAiReportReady }) {
   const [activeHand, setActiveHand] = useState('left');
@@ -231,6 +415,7 @@ export default function GripReport({ patientName, patientInfo, onClose, reportDa
     }
     // 如果选中的手没有数据，返回 null（会显示"数据加载失败"页面）
     if (!handData) return null;
+    const derivedTiming = deriveGripTimingFromSeries(handData);
     // 确保关键字段有默认值，防止 undefined 崩溃
     return {
       ...handData,
@@ -243,7 +428,7 @@ export default function GripReport({ patientName, patientInfo, onClose, reportDa
       forceTimeSeries: handData.forceTimeSeries || {},
       eulerData: handData.eulerData || {},
       angularVelocity: handData.angularVelocity || [],
-      timeAnalysis: handData.timeAnalysis || [],
+      timeAnalysis: buildDisplayTimeAnalysis(handData, derivedTiming),
     };
   }, [rawReport, activeHand]);
 
@@ -253,6 +438,18 @@ export default function GripReport({ patientName, patientInfo, onClose, reportDa
   const hasBothHands = hasLeft && hasRight;
   const gripAiPayload = useMemo(() => buildGripAiPayload(rawReport), [rawReport]);
   const cleanAiReport = useMemo(() => sanitizeAiReport(aiReport), [aiReport]);
+  const scoreResult = useMemo(
+    () => rawReport ? scoreGrip(rawReport, patientInfo || { name: patientName, gender: '未知' }) : null,
+    [rawReport, patientInfo, patientName],
+  );
+  const cachedAiReportValid = useMemo(
+    () => isGripAiReportCompatible(propsReportData?.aiReport, scoreResult, { rejectStaleTimingText: true }),
+    [propsReportData?.aiReport, scoreResult],
+  );
+  const currentAiReportValid = useMemo(
+    () => isGripAiReportCompatible(aiReport, scoreResult),
+    [aiReport, scoreResult],
+  );
 
   useEffect(() => {
     onAiReportReadyRef.current = onAiReportReady;
@@ -260,18 +457,22 @@ export default function GripReport({ patientName, patientInfo, onClose, reportDa
 
   // 如果历史记录里已有 AI 报告，直接用
   useEffect(() => {
-    if (propsReportData?.aiReport && !aiReport) {
+    if (propsReportData?.aiReport && !cachedAiReportValid && aiReport === propsReportData.aiReport) {
+      setAiReport(null);
+      return;
+    }
+    if (propsReportData?.aiReport && cachedAiReportValid && !aiReport) {
       setAiReport(propsReportData.aiReport);
     }
-  }, [propsReportData, aiReport]);
+  }, [propsReportData, aiReport, cachedAiReportValid]);
 
   useEffect(() => {
     aiRequestStartedRef.current = false;
-  }, [gripAiPayload, propsReportData?.aiReport]);
+  }, [gripAiPayload, propsReportData?.aiReport, cachedAiReportValid]);
 
   // AI 综合评估：data 就绪后自动调用
   useEffect(() => {
-    if (!gripAiPayload || aiReport || propsReportData?.aiReport) return;
+    if (!gripAiPayload || (aiReport && currentAiReportValid) || (propsReportData?.aiReport && cachedAiReportValid)) return;
     if (aiRequestStartedRef.current) return;
     aiRequestStartedRef.current = true;
     let cancelled = false;
@@ -281,7 +482,10 @@ export default function GripReport({ patientName, patientInfo, onClose, reportDa
     import('../../lib/gripPythonApi').then(({ generateGripAIReport }) => {
       return generateGripAIReport(
         patientInfo || { name: patientName, gender: '未知' },
-        gripAiPayload,
+        {
+          ...gripAiPayload,
+          score_context: scoreToAiContext(scoreResult),
+        },
       );
     }).then(res => {
       if (res.success) {
@@ -301,7 +505,7 @@ export default function GripReport({ patientName, patientInfo, onClose, reportDa
     });
 
     return () => { cancelled = true; };
-  }, [gripAiPayload, patientInfo, patientName, aiReport, propsReportData?.aiReport]);
+  }, [gripAiPayload, patientInfo, patientName, aiReport, currentAiReportValid, propsReportData?.aiReport, cachedAiReportValid, scoreResult]);
 
   const colors = ['#0066CC', '#0891B2', '#059669', '#D97706', '#9333EA', '#DC2626'];
   const fingerNames = ['拇指', '食指', '中指', '无名指', '小指', '手掌'];
@@ -530,6 +734,13 @@ export default function GripReport({ patientName, patientInfo, onClose, reportDa
         <div ref={contentRef} className="flex-1 overflow-y-auto p-6 scroll-smooth" style={{ background: 'var(--bg-primary)' }}>
           <div className="max-w-[1100px] mx-auto space-y-8">
 
+            <ReportSummaryCard
+              scoreResult={scoreResult}
+              title="项目评分"
+              aiLoading={aiLoading}
+              aiIntro={currentAiReportValid ? cleanAiReport?.overview : ''}
+            />
+
             {/* 基本信息：总帧数移到不显眼位置，时间范围改为总时长 */}
             <section id="grip-overview">
               <SectionHeader title="基本信息" />
@@ -680,7 +891,7 @@ export default function GripReport({ patientName, patientInfo, onClose, reportDa
 
             {/* ═══════════ 综合评估（AI 生成） ═══════════ */}
             <section id="grip-ai-assessment">
-              <SectionHeader title="AI综合评估" />
+              <SectionHeader title="AI分项分析" />
               <div className="zeiss-card p-5">
                 {aiLoading ? (
                   <div className="py-4">
@@ -747,24 +958,16 @@ export default function GripReport({ patientName, patientInfo, onClose, reportDa
                         </div>
                       )}
 
-                      {/* 测试概况 */}
-                      {cleanAiReport.overview && (
-                        <div className="p-4 rounded-lg" style={{ background: 'var(--bg-hover, #f8f9fa)' }}>
-                          <h5 className="font-bold mb-2" style={{ color: 'var(--text-primary)', fontSize: '14px' }}>测试概况</h5>
-                          <p className="text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>{cleanAiReport.overview}</p>
-                        </div>
-                      )}
-
                       {cleanAiReport.left_hand_analysis && (
                         <div className="p-4 rounded-lg" style={{ background: 'var(--bg-hover, #f8f9fa)' }}>
-                          <h5 className="font-bold mb-2" style={{ color: 'var(--text-primary)', fontSize: '14px' }}>左手AI综合评估</h5>
+                          <h5 className="font-bold mb-2" style={{ color: 'var(--text-primary)', fontSize: '14px' }}>左手分项分析</h5>
                           <p className="text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>{cleanAiReport.left_hand_analysis}</p>
                         </div>
                       )}
 
                       {cleanAiReport.right_hand_analysis && (
                         <div className="p-4 rounded-lg" style={{ background: 'var(--bg-hover, #f8f9fa)' }}>
-                          <h5 className="font-bold mb-2" style={{ color: 'var(--text-primary)', fontSize: '14px' }}>右手AI综合评估</h5>
+                          <h5 className="font-bold mb-2" style={{ color: 'var(--text-primary)', fontSize: '14px' }}>右手分项分析</h5>
                           <p className="text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>{cleanAiReport.right_hand_analysis}</p>
                         </div>
                       )}
@@ -833,6 +1036,7 @@ export default function GripReport({ patientName, patientInfo, onClose, reportDa
             </section>
 
             <div className="h-8" />
+            <BasisNote className="pb-6 text-center" />
           </div>
         </div>
       </div>
