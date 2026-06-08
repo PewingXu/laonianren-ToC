@@ -89,9 +89,11 @@ export function overallLevel(totalScore, itemResults = []) {
   };
 }
 
-function makeResult({ type, title, score, maxScore = 25, metrics = {}, indicators = [], summary, shortfalls = [], redFlags = [], priorityRisk = false, note = '' }) {
+function makeResult({ type, title, score, maxScore = 25, metrics = {}, indicators = [], summary, shortfalls = [], redFlags = [], priorityRisk = false, note = '', invalid = false, grade = null }) {
   const roundedScore = Math.round(toNumber(score, 0));
-  const status = scoreStatus(roundedScore, maxScore);
+  const status = invalid && grade
+    ? { text: grade.text, color: grade.color, bg: grade.bg }
+    : scoreStatus(roundedScore, maxScore);
   return {
     type,
     title,
@@ -107,6 +109,7 @@ function makeResult({ type, title, score, maxScore = 25, metrics = {}, indicator
     redFlags,
     priorityRisk,
     note,
+    invalid,
   };
 }
 
@@ -145,6 +148,32 @@ export function extractGripMetrics(reportData = {}, patientInfo = {}) {
 
 export function scoreGrip(reportData, patientInfo) {
   const m = extractGripMetrics(reportData, patientInfo);
+
+  // ============ 数据有效性硬性校验（防呆） ============
+  const invalidReasons = [];
+  if (m.maxKg <= 0) invalidReasons.push('未采集到有效握力数据');
+  if (m.maxKg > 0 && m.maxKg < 5) invalidReasons.push(`最大握力仅 ${m.maxKg}kg，远低于正常人最低水平，可能只是手指触碰未真实握紧`);
+
+  if (invalidReasons.length > 0) {
+    return makeResult({
+      type: 'grip',
+      title: '握力评分',
+      score: 0,
+      metrics: m,
+      indicators: [
+        { label: '最大握力', value: m.maxKg ? `${m.maxKg}kg` : '--' },
+        { label: '参考阈值', value: `${m.threshold}kg` },
+      ],
+      summary: '本次采集数据不足以反映真实握力，建议规范佩戴手套后用最大力量持续握紧 3-5 秒再做评估。',
+      redFlags: invalidReasons,
+      priorityRisk: true,
+      invalid: true,
+      grade: { text: '数据异常', color: C.red, bg: '#FEF2F2' },
+      note: '数据有效性未通过，无法做出能力判断。',
+    });
+  }
+  // ============ 防呆结束 ============
+
   let score = 5;
   if (m.ratio >= 1.1) score = 25;
   else if (m.ratio >= 1) score = 20;
@@ -185,15 +214,64 @@ export function scoreGrip(reportData, patientInfo) {
 
 export function extractSitStandMetrics(reportData = {}) {
   const ds = reportData.duration_stats || {};
+  const ps = reportData.pressure_stats || {};
+  const sym = reportData.symmetry || {};
   const totalDuration = toNumber(ds.total_duration, 0);
   const numCycles = toNumber(ds.num_cycles, 0);
   const avgDuration = toNumber(ds.avg_duration, null);
   const cycleDurations = Array.isArray(ds.cycle_durations) ? ds.cycle_durations.map(v => toNumber(v, 0)).filter(Boolean) : [];
-  return { totalDuration, numCycles, avgDuration, cycleDurations };
+  const cyclePeakForces = Array.isArray(reportData.cycle_peak_forces)
+    ? reportData.cycle_peak_forces.map(v => toNumber(v, 0))
+    : [];
+  // 防呆校验所需字段
+  const footMax = toNumber(ps.foot_max, 0);
+  const footAvg = toNumber(ps.foot_avg, 0);
+  const sitMax = toNumber(ps.sit_max, 0);
+  const sitAvg = toNumber(ps.sit_avg, 0);
+  const maxCyclePeak = cyclePeakForces.length > 0 ? Math.max(...cyclePeakForces) : 0;
+  const leftRightRatio = toNumber(sym.left_right_ratio, null);
+  return {
+    totalDuration, numCycles, avgDuration, cycleDurations, cyclePeakForces,
+    footMax, footAvg, sitMax, sitAvg, maxCyclePeak, leftRightRatio,
+  };
 }
 
 export function scoreSitStand(reportData) {
   const m = extractSitStandMetrics(reportData);
+
+  // ============ 数据有效性硬性校验（防呆） ============
+  // 只要触发以下任一条，直接判定为数据无效，score=0，不允许给"优秀/良好"
+  const invalidReasons = [];
+  if (m.numCycles > 0 && m.numCycles < 3) invalidReasons.push(`完整周期数仅 ${m.numCycles} 次，未达到通常要求的 5 次完整起坐标准`);
+  if (m.totalDuration > 0 && m.totalDuration < 5) invalidReasons.push(`总时长 ${round(m.totalDuration, 1)}s 过短，未完成完整 5 次起坐`);
+  if (m.maxCyclePeak === 0 && m.cyclePeakForces.length > 0) invalidReasons.push('各周期峰值力均为 0，力值检测异常，可能采集设备故障或信号丢失');
+  if (m.maxCyclePeak > 0 && m.maxCyclePeak < 50) invalidReasons.push(`周期峰值力最大仅 ${round(m.maxCyclePeak, 1)}N，远低于正常起坐应有的力值`);
+  if (m.footMax > 0 && m.footMax < 50) invalidReasons.push(`脚垫最大压力 ${round(m.footMax, 1)} 过低，未捕捉到站立瞬间的发力`);
+  if (m.footAvg === 0 && m.footMax === 0) invalidReasons.push('脚垫平均压力为 0，接触面积也为 0，脚垫数据严重缺失');
+  if (m.sitMax > 0 && m.sitMax < 100) invalidReasons.push(`坐垫最大压力 ${round(m.sitMax, 1)} 过低，未捕捉到完整坐姿`);
+  if (m.totalDuration <= 0 && m.numCycles <= 0) invalidReasons.push('总时长与周期数均为 0，未形成有效起坐数据');
+
+  if (invalidReasons.length > 0) {
+    return makeResult({
+      type: 'sitstand',
+      title: '起坐评分',
+      score: 0,
+      metrics: m,
+      indicators: [
+        { label: '总时长', value: m.totalDuration ? `${round(m.totalDuration, 1)}s` : '--' },
+        { label: '完成次数', value: m.numCycles ? `${m.numCycles}次` : '--' },
+        { label: '关注线', value: '≥12s' },
+      ],
+      summary: '本次采集数据不足以反映真实起坐能力，建议检查压力传感设备是否正常连接，重新规范完成 5 次完整起坐测试。',
+      redFlags: invalidReasons,
+      priorityRisk: true,
+      invalid: true,
+      grade: { text: '数据异常', color: C.red, bg: '#FEF2F2' },
+      note: '数据有效性未通过，无法做出能力判断。',
+    });
+  }
+  // ============ 防呆结束 ============
+
   let score = 5;
   if (m.totalDuration > 0 && m.totalDuration <= 11.19) score = 25;
   else if (m.totalDuration > 0 && m.totalDuration <= 13.69) score = 20;
@@ -386,6 +464,39 @@ function scoreCopPathLength(pathLength) {
 
 export function scoreStanding(reportData) {
   const m = extractStandingMetrics(reportData);
+
+  // ============ 数据有效性硬性校验（防呆） ============
+  const invalidReasons = [];
+  if (m.leftArchIndex == null && m.rightArchIndex == null) invalidReasons.push('左右足弓数据均缺失');
+  if (!m.hasCopMetric && m.pathLength == null) invalidReasons.push('COP 稳定性指标全部缺失');
+  if (m.leftPressureRatio === 50 && m.rightPressureRatio === 50 && !m.hasCopMetric && m.leftArchIndex == null) {
+    invalidReasons.push('左右压力分布与稳定性数据均无有效采集，可能受试者未真正站立在足垫上');
+  }
+  if (m.contactArea != null && m.contactArea > 0 && m.contactArea < 30) {
+    invalidReasons.push(`足底接触面积仅 ${round(m.contactArea, 1)} cm²，远低于双脚站立应有面积`);
+  }
+
+  if (invalidReasons.length > 0) {
+    return makeResult({
+      type: 'standing',
+      title: '静态站立评分',
+      score: 0,
+      metrics: m,
+      indicators: [
+        { label: '左足弓指数', value: m.leftArchIndex != null ? round(m.leftArchIndex, 2) : '--' },
+        { label: '右足弓指数', value: m.rightArchIndex != null ? round(m.rightArchIndex, 2) : '--' },
+        { label: 'COP 轨迹长度', value: m.pathLength != null ? `${round(m.pathLength, 1)}` : '--' },
+      ],
+      summary: '本次采集数据不足以反映真实静态平衡能力，建议确保受试者双脚完整站立在足垫上、保持自然站姿 10-15 秒后再做评估。',
+      redFlags: invalidReasons,
+      priorityRisk: true,
+      invalid: true,
+      grade: { text: '数据异常', color: C.red, bg: '#FEF2F2' },
+      note: '数据有效性未通过，无法做出能力判断。',
+    });
+  }
+  // ============ 防呆结束 ============
+
   const stageScore = m.hasFourStageLevel ? Math.round((m.fourStageLevel / 4) * 10) : 0;
   const copScore = scoreCopPathLength(m.pathLength);
   const loadScore = m.loadOffset <= 10 ? 5 : m.loadOffset <= 20 ? 3 : m.loadOffset <= 30 ? 1 : 0;

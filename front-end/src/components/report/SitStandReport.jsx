@@ -796,7 +796,10 @@ export default function SitStandReport({ patientInfo, reportData: propsReportDat
   const sitEvoLabels = ['Start', '10%', '20%', '30%', '40%', '50%', '60%', '70%', '80%', '90%', 'End'];
 
   const totalDur = durationStats.total_duration || 0;
-  const evalLevel = totalDur > 0 && totalDur < 12 ? { text: '优秀', color: C.green, bg: '#05966915' }
+  // 防呆：若评分函数判定为数据无效，评估等级直接显示"数据异常"，不允许给"优秀/正常/偏慢"
+  const evalLevel = scoreResult?.invalid
+    ? { text: '数据异常', color: C.red, bg: '#DC262615' }
+    : totalDur > 0 && totalDur < 12 ? { text: '优秀', color: C.green, bg: '#05966915' }
     : totalDur <= 15 ? { text: '正常', color: C.cyan, bg: '#0891B215' }
     : totalDur <= 20 ? { text: '偏慢', color: C.amber, bg: '#D9770615' }
     : { text: '异常', color: C.red, bg: '#DC262615' };
