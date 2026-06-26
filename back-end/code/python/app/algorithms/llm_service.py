@@ -11,6 +11,7 @@ from openai import OpenAI
 
 from llm_config import get_llm_config
 from prompts import ASSESSMENT_PROMPTS, append_common_user_rules
+from prompts.common_rules import render_score_context
 
 
 _EMPTY_PRAISE_PATTERNS = [
@@ -107,7 +108,17 @@ def _build_messages(assessment_type: str, patient_info: dict, assessment_data: d
         raise ValueError(f"Unsupported assessment_type: {assessment_type}")
 
     system_prompt, prompt_builder = ASSESSMENT_PROMPTS[assessment_type]
-    user_prompt = append_common_user_rules(prompt_builder(patient_info, assessment_data))
+    base_prompt = prompt_builder(patient_info, assessment_data)
+
+    # 把前端算好的系统评分（含各小项得分明细、红线）渲染进 prompt，
+    # 让 AI 真正看到分数与扣分细则，使其文字与评分卡口径一致。
+    score_block = ""
+    if isinstance(assessment_data, dict):
+        score_block = render_score_context(assessment_data.get("score_context"))
+    if score_block:
+        base_prompt = f"{base_prompt}\n\n{score_block}"
+
+    user_prompt = append_common_user_rules(base_prompt)
     messages = [
         {"role": "system", "content": system_prompt},
         {"role": "user", "content": user_prompt},

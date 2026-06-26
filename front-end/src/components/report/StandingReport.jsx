@@ -880,6 +880,7 @@ export default function StandingReport({ reportData, patientInfo, onClose, onAiR
                   aiLoading={aiLoading}
                   aiError={aiError}
                   aiReport={aiReport}
+                  systemLevel={scoreResult ? { text: scoreResult.level, score: scoreResult.score, maxScore: scoreResult.maxScore } : null}
                   sections={ASSESSMENT_AI_SECTION_CONFIG.standing}
                   excludeKeys={['overview']}
                 />

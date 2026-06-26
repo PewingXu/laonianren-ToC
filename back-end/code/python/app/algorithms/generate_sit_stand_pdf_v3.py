@@ -2186,7 +2186,7 @@ def generate_report_from_content(stand_csv_content, sit_csv_content, output_dir=
     foot_avg = float(np.mean(stand_force_arr)) if len(stand_force_arr) > 0 else 0
     sit_max = float(np.max(sit_force_arr)) if len(sit_force_arr) > 0 else 0
     sit_avg = float(np.mean(sit_force_arr)) if len(sit_force_arr) > 0 else 0
-    # 最大变化率（相邻帧之间的最大差值）
+    # 最大变化率（相邻帧之间的最大差值，单位：牛顿/帧）
     max_foot_change_rate = 0
     if len(stand_force_arr) > 1:
         foot_diff = np.abs(np.diff(stand_force_arr))
@@ -2195,6 +2195,16 @@ def generate_report_from_content(stand_csv_content, sit_csv_content, output_dir=
     if len(sit_force_arr) > 1:
         sit_diff = np.abs(np.diff(sit_force_arr))
         max_sit_change_rate = float(np.max(sit_diff))
+    # 估计坐垫帧间隔（秒/帧），用于把"牛顿/帧"换算成与帧率无关的"牛顿/秒"
+    # 坐垫"砸下去"识别必须用 N/s，否则采样率不同会导致同一动作判定结果不同
+    try:
+        sit_frame_interval = _estimate_frame_interval_seconds(sit_times)
+    except Exception:
+        sit_frame_interval = 0.08
+    if not sit_frame_interval or sit_frame_interval <= 0:
+        sit_frame_interval = 0.08
+    # 坐垫最大加载速率（牛顿/秒）= 最大单帧突变 / 帧间隔
+    max_sit_loading_rate_per_sec = max_sit_change_rate / sit_frame_interval
     pressure_stats = {
         'foot_max': round(foot_max, 0),
         'foot_avg': round(foot_avg, 0),
@@ -2202,6 +2212,8 @@ def generate_report_from_content(stand_csv_content, sit_csv_content, output_dir=
         'sit_avg': round(sit_avg, 0),
         'max_foot_change_rate': round(max_foot_change_rate, 0),
         'max_sit_change_rate': round(max_sit_change_rate, 0),
+        'sit_frame_interval': round(sit_frame_interval, 4),       # 坐垫帧间隔(秒/帧)
+        'max_sit_loading_rate_per_sec': round(max_sit_loading_rate_per_sec, 0),  # 坐垫最大加载速率(N/s)
     }
 
     # --- 4.6.6 cycle_peak_forces: 各周期峰值力 ---
@@ -2211,6 +2223,37 @@ def generate_report_from_content(stand_csv_content, sit_csv_content, output_dir=
         seg_force = stand_force_arr[start_idx:end_idx]
         if len(seg_force) > 0:
             cycle_peak_forces.append(round(float(np.max(seg_force)), 0))
+
+    # --- 4.6.7 force_curve_smoothness: 坐站力-时间曲线平滑度 ---
+    # 评估"启动顺畅、曲线平滑 vs 迟滞/代偿"：
+    # 健康起坐 = 一条干净的单调上升曲线；代偿(前后晃身攒劲/撑两次)= 曲线反复上下、多个小峰。
+    # 指标 = 总变差 TV / 净变化 range：
+    #   单调上升 → TV ≈ range → 比值 ≈ 1.0（最平滑）
+    #   有 1 次晃动回落 → TV = range + 2×晃动幅度 → 比值 > 1
+    #   多次晃动/代偿 → 比值更大
+    # 该比值与帧率、力的绝对幅度均无关。
+    print(" 计算坐站曲线平滑度...")
+    def _curve_smoothness_ratio(seg):
+        seg = np.asarray(seg, dtype=float)
+        if len(seg) < 4:
+            return None
+        # 轻度滑动平均（窗口 3）去除传感器噪声，避免噪声被当成"代偿晃动"
+        kernel = np.ones(3) / 3.0
+        smoothed = np.convolve(seg, kernel, mode='valid')
+        rng = float(np.max(smoothed) - np.min(smoothed))
+        if rng <= 1e-6:
+            return None
+        tv = float(np.sum(np.abs(np.diff(smoothed))))  # 总变差
+        return tv / rng
+    smoothness_ratios = []
+    for start_idx, end_idx in stand_cycle_ranges:
+        ratio = _curve_smoothness_ratio(stand_force_arr[start_idx:end_idx])
+        if ratio is not None:
+            smoothness_ratios.append(ratio)
+    # 取所有周期的中位数（抗个别异常周期）
+    force_curve_smoothness = round(float(np.median(smoothness_ratios)), 3) if smoothness_ratios else None
+    pressure_stats['force_curve_smoothness'] = force_curve_smoothness  # 曲线平滑度比值（≈1 最平滑，越大越代偿）
+    pressure_stats['force_curve_cycle_count'] = len(smoothness_ratios)
 
     # 5. 构建返回结果
     result = {

@@ -2,12 +2,15 @@ import React from 'react';
 import { sanitizeAiReport } from '../../lib/aiTextSanitizer';
 
 function getLevelStyle(levelText = '') {
-  if (/(优秀|正常|良好)/.test(levelText)) {
+  // 统一四档评价：绿色 = 表现较好
+  if (/表现较好/.test(levelText)) {
     return { background: '#ECFDF5', color: '#059669' };
   }
-  if (/(偏慢|偏低|需关注|一般)/.test(levelText)) {
+  // 橙色：轻度关注 / 中度关注
+  if (/(轻度关注|中度关注)/.test(levelText)) {
     return { background: '#FFFBEB', color: '#D97706' };
   }
+  // 红色：重点关注 / 数据异常（含其它兜底）
   return { background: '#FEF2F2', color: '#DC2626' };
 }
 
@@ -19,6 +22,7 @@ export default function AssessmentAiPanel({
   excludeKeys = [],
   loadingText = 'AI 正在分析评估数据...',
   emptyText = '暂无 AI 分析数据',
+  systemLevel = null, // { text, score, maxScore }：以系统评分为准，覆盖 AI 自评等级，保证页眉/页脚一致
 }) {
   if (aiLoading) {
     return (
@@ -55,18 +59,23 @@ export default function AssessmentAiPanel({
   const excludedSectionKeys = new Set(excludeKeys);
   const visibleSections = sections.filter(section => !excludedSectionKeys.has(section.key) && cleanReport[section.key]);
 
+  // 评估等级以系统评分为准（与页眉评分卡同源），避免 AI 自评等级与系统分数打架
+  const displayLevel = systemLevel && systemLevel.text
+    ? { text: systemLevel.text, standard: `系统综合评分 ${systemLevel.score}/${systemLevel.maxScore}` }
+    : cleanReport.eval_level;
+
   return (
     <>
-      {cleanReport.eval_level && (
+      {displayLevel && (
         <div className="flex items-center gap-3 mb-5 pb-4" style={{ borderBottom: '1px solid var(--border-light)' }}>
           <div
             className="px-4 py-2 rounded-lg text-sm font-bold"
-            style={getLevelStyle(cleanReport.eval_level.text)}
+            style={getLevelStyle(displayLevel.text)}
           >
-            评估等级: {cleanReport.eval_level.text}
+            评估等级: {displayLevel.text}
           </div>
           <div className="text-xs" style={{ color: 'var(--text-muted)' }}>
-            {cleanReport.eval_level.standard}
+            {displayLevel.standard}
           </div>
         </div>
       )}

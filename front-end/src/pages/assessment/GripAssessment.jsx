@@ -182,6 +182,82 @@ export default function GripAssessment() {
   const leftAssessmentIdRef = useRef(null);
   const rightAssessmentIdRef = useRef(null);
 
+  // ─── 戴错手检测（防呆） ───
+  // 提示测右手时用户却在握左手手套（或反之），实时提示切换
+  const [wrongHandWarning, setWrongHandWarning] = useState(null);
+  const wrongHandWarningRef = useRef(null);
+  const lastLeftAvgRef = useRef(0);   // 左手手套最近平均压力
+  const lastRightAvgRef = useRef(0);  // 右手手套最近平均压力
+  const wrongHandFramesRef = useRef(0);   // 错误手连续用力帧计数
+  const correctHandFramesRef = useRef(0); // 正确手连续用力帧计数（用于自动消除警告）
+  const WRONG_HAND_ACTIVE_AVG = 8;    // 平均 ADC 超过此值视为"正在用力握"
+  const WRONG_HAND_IDLE_AVG = 3;      // 平均 ADC 低于此值视为"基本没用力"
+  const WRONG_HAND_TRIGGER_FRAMES = 10; // 连续帧数（约 0.1-0.2s）才触发，防误报
+
+  // 采集窗口内峰值，用于采集结束时硬校验"是否用错了手"
+  const recExpectedPeakRef = useRef(0); // 本次采集中"应测手"的峰值平均压力
+  const recOtherPeakRef = useRef(0);    // 本次采集中"另一只手"的峰值平均压力
+  const REAL_GRIP_MIN = 4;              // 应测手峰值低于此值 → 视为没握 / 用错了手
+  // 戴错手拦截弹窗：{ hand: 'left'|'right' }
+  const [wrongHandModal, setWrongHandModal] = useState(null);
+  const expectedHandRef = useRef('left'); // 当前阶段应测的手（left/right），用于判断是否切手
+
+  const checkWrongHand = useCallback((sourceHand, avgPressure) => {
+    const expected = currentHandRef.current; // 当前阶段应该测的手
+
+    // 采集中：记录应测手 / 另一只手 的峰值，供采集结束硬校验
+    if (isRecordingRef.current) {
+      if (sourceHand === expected) {
+        if (avgPressure > recExpectedPeakRef.current) recExpectedPeakRef.current = avgPressure;
+      } else if (avgPressure > recOtherPeakRef.current) {
+        recOtherPeakRef.current = avgPressure;
+      }
+    }
+
+    if (sourceHand === 'left') lastLeftAvgRef.current = avgPressure;
+    else lastRightAvgRef.current = avgPressure;
+
+    const expectedAvg = expected === 'left' ? lastLeftAvgRef.current : lastRightAvgRef.current;
+    const wrongAvg = expected === 'left' ? lastRightAvgRef.current : lastLeftAvgRef.current;
+
+    // 错误手在持续用力 且 正确手基本没动 → 累计触发帧
+    if (wrongAvg > WRONG_HAND_ACTIVE_AVG && expectedAvg < WRONG_HAND_IDLE_AVG) {
+      wrongHandFramesRef.current += 1;
+      correctHandFramesRef.current = 0;
+      if (wrongHandFramesRef.current >= WRONG_HAND_TRIGGER_FRAMES && !wrongHandWarningRef.current) {
+        const expectedLabel = expected === 'left' ? '左手' : '右手';
+        const actualLabel = expected === 'left' ? '右手' : '左手';
+        const msg = `检测到您正在使用${actualLabel}手套，当前应测【${expectedLabel}】，请切换到${expectedLabel}手套`;
+        wrongHandWarningRef.current = msg;
+        setWrongHandWarning(msg);
+      }
+    } else if (expectedAvg > WRONG_HAND_ACTIVE_AVG) {
+      // 正确手开始用力 → 累计正确帧，连续达标后清除警告
+      correctHandFramesRef.current += 1;
+      wrongHandFramesRef.current = 0;
+      if (correctHandFramesRef.current >= WRONG_HAND_TRIGGER_FRAMES && wrongHandWarningRef.current) {
+        wrongHandWarningRef.current = null;
+        setWrongHandWarning(null);
+      }
+    } else {
+      // 双手都没明显用力 → 缓慢衰减计数，不立刻清警告（让用户看到提示）
+      wrongHandFramesRef.current = Math.max(0, wrongHandFramesRef.current - 1);
+    }
+  }, []);
+
+  // 仅在"应测手切换"（左→右 或 回到另一只手）时重置戴错手状态，
+  // idle→recording 同一只手时不清除警告，让提示贯穿采集全程。
+  useEffect(() => {
+    const expected = phase.startsWith('left') ? 'left' : phase.startsWith('right') ? 'right' : expectedHandRef.current;
+    if (expected !== expectedHandRef.current) {
+      expectedHandRef.current = expected;
+      wrongHandFramesRef.current = 0;
+      correctHandFramesRef.current = 0;
+      wrongHandWarningRef.current = null;
+      setWrongHandWarning(null);
+    }
+  }, [phase]);
+
   // 让 currentHandRef 跟随 phase 自动同步，确保热力图始终显示当前阶段对应的手的数据
   useEffect(() => {
     if (phase.startsWith('left')) {
@@ -309,6 +385,9 @@ export default function GripAssessment() {
       const totalPressure = sensorArray.reduce((a, b) => a + b, 0);
       const avgPressure = totalPressure / sensorArray.length;
 
+      // 戴错手检测（防呆）
+      checkWrongHand('left', avgPressure);
+
       // 始终更新左侧面板的实时预览数据（无论是否在采集）
       if (currentHandRef.current === 'left') {
         setPressure(avgPressure);
@@ -340,6 +419,9 @@ export default function GripAssessment() {
       const totalPressure = sensorArray.reduce((a, b) => a + b, 0);
       const avgPressure = totalPressure / sensorArray.length;
 
+      // 戴错手检测（防呆）
+      checkWrongHand('right', avgPressure);
+
       // 始终更新左侧面板的实时预览数据（无论是否在采集）
       if (currentHandRef.current === 'right') {
         setPressure(avgPressure);
@@ -363,7 +445,7 @@ export default function GripAssessment() {
       gloveService.setOnLeftHandData(null);
       gloveService.setOnRightHandData(null);
     };
-  }, [leftGloveConnected, rightGloveConnected]);
+  }, [leftGloveConnected, rightGloveConnected, checkWrongHand]);
 
   // 更新设备状态
   useEffect(() => {
@@ -495,6 +577,9 @@ export default function GripAssessment() {
     frameRef.current = 0;
     isRecordingRef.current = true;
     currentHandRef.current = isLeft ? 'left' : 'right';
+    // 重置本次采集的戴错手硬校验峰值
+    recExpectedPeakRef.current = 0;
+    recOtherPeakRef.current = 0;
 
     if (isSimulating) {
       addSimLog(`模拟模式开始采集 ${isLeft ? '左手' : '右手'}`, 'info');
@@ -511,6 +596,8 @@ export default function GripAssessment() {
         const totalPressure = sensorData.reduce((a, b) => a + b, 0);
         const avgPressure = totalPressure / sensorData.length;
         setPressure(avgPressure);
+        // 模拟模式只生成应测手，更新峰值避免采集结束硬校验误判
+        if (avgPressure > recExpectedPeakRef.current) recExpectedPeakRef.current = avgPressure;
 
         // 完整数据用于报告（不截断）
         const fullRef = isLeft ? leftFullDataRef : rightFullDataRef;
@@ -608,6 +695,32 @@ export default function GripAssessment() {
       } catch (e) {
         console.error('[GripAssessment] 恢复双手模式失败:', e);
       }
+    }
+
+    // ─── 采集结束硬校验：是否用错了手（有一只错握都不出报告） ───
+    const expectedHand = currentHandRef.current; // 本次应测的手
+    const expectedPeak = recExpectedPeakRef.current;
+    const otherPeak = recOtherPeakRef.current;
+    // ①另一只手有明显抓握且不弱于应测手 → 明确用错手（串口模式双手都推时最可靠）
+    const otherHandGripped = otherPeak >= WRONG_HAND_ACTIVE_AVG && otherPeak >= expectedPeak * 0.8;
+    // ②应测手全程几乎没握 → 没用正确的手（覆盖后端单手模式下另一只手数据不推送的情况）
+    const expectedNeverGripped = expectedPeak < REAL_GRIP_MIN;
+    if (!isSimulating && (otherHandGripped || expectedNeverGripped)) {
+      addSimLog(`戴错手拦截：应测${expectedHand === 'left' ? '左' : '右'}手，应测手峰值=${expectedPeak.toFixed(1)}，另一只手峰值=${otherPeak.toFixed(1)}`, 'warn');
+      // 清空本次采集数据，回到本手 idle 让用户重测，不进入下一阶段/不出报告
+      if (expectedHand === 'left') {
+        leftFullDataRef.current = [];
+        leftRawFramesRef.current = [];
+        setLeftData([]);
+      } else {
+        rightFullDataRef.current = [];
+        rightRawFramesRef.current = [];
+        setRightData([]);
+      }
+      setPhase(expectedHand === 'left' ? 'left-idle' : 'right-idle');
+      setTimer(0);
+      setWrongHandModal({ hand: expectedHand, reason: otherHandGripped ? 'wrong' : 'nogrip' });
+      return;
     }
 
     if (phase === 'left-recording') {
@@ -877,6 +990,28 @@ export default function GripAssessment() {
         </div>
       )}
 
+      {/* 戴错手拦截弹窗：用错手则不出报告，强制重测本手 */}
+      {wrongHandModal && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center zeiss-overlay animate-fadeIn">
+          <div className="zeiss-dialog p-8 flex flex-col items-center gap-4 max-w-[420px] animate-scaleIn">
+            <div className="w-14 h-14 rounded-full flex items-center justify-center" style={{ background: '#FEF2F2' }}>
+              <svg className="w-7 h-7" style={{ color: '#DC2626' }} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+            </div>
+            <h3 className="text-lg font-bold text-center" style={{ color: '#DC2626' }}>
+              本次{wrongHandModal.hand === 'left' ? '左手' : '右手'}采集无效
+            </h3>
+            <p className="text-sm text-center leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+              {wrongHandModal.reason === 'wrong'
+                ? `检测到您本次用了【另一只手】的手套，本应测【${wrongHandModal.hand === 'left' ? '左手' : '右手'}】。`
+                : `未检测到【${wrongHandModal.hand === 'left' ? '左手' : '右手'}】的有效抓握，可能用错了手或没有握紧。`}
+              <br />为保证报告准确，<span style={{ color: '#DC2626', fontWeight: 700 }}>本次采集已作废</span>，请戴对手套后用【{wrongHandModal.hand === 'left' ? '左手' : '右手'}】重新采集。
+            </p>
+            <button onClick={() => setWrongHandModal(null)}
+              className="zeiss-btn-primary w-full py-3 text-sm mt-2">重新采集{wrongHandModal.hand === 'left' ? '左手' : '右手'}</button>
+          </div>
+        </div>
+      )}
+
       {/* 报告完成弹窗 */}
       {showCompleteDialog && (
         <div className="fixed inset-0 z-50 flex items-center justify-center zeiss-overlay animate-fadeIn">
@@ -909,6 +1044,14 @@ export default function GripAssessment() {
 
         {/* 右侧3D区域 */}
         <div className="flex-1 flex flex-col items-center justify-center relative">
+          {/* 戴错手警示条（防呆） */}
+          {wrongHandWarning && (
+            <div className="absolute top-6 left-1/2 -translate-x-1/2 z-30 flex items-center gap-3 px-5 py-3 rounded-xl animate-pulse"
+              style={{ background: '#FEF2F2', border: '2px solid #DC2626', boxShadow: '0 8px 24px rgba(220,38,38,0.25)' }}>
+              <span className="text-xl">⚠️</span>
+              <span className="text-sm font-bold" style={{ color: '#DC2626' }}>{wrongHandWarning}</span>
+            </div>
+          )}
           <div className="relative w-full h-full flex items-center justify-center model-container m-3 rounded-xl">
             <HandModel isRecording={phase.includes('recording')} pressureValue={pressure} isLeftHand={phase.startsWith('left')} heatmapCanvas={heatmapCanvas} />
             {phase === 'processing' && (

@@ -916,21 +916,29 @@ export default function GripReport({ patientName, patientInfo, onClose, reportDa
                   </div>
                 ) : cleanAiReport ? (
                   <>
-                    {/* 评估等级标签 */}
-                    {cleanAiReport.eval_level && (
-                      <div className="flex items-center gap-3 mb-5 pb-4" style={{ borderBottom: '1px solid var(--border-light)' }}>
-                        <div className="px-4 py-2 rounded-lg text-sm font-bold"
-                          style={{
-                            background: cleanAiReport.eval_level.text?.includes('正常') ? '#ECFDF5' : cleanAiReport.eval_level.text?.includes('偏低') ? '#FFFBEB' : '#FEF2F2',
-                            color: cleanAiReport.eval_level.text?.includes('正常') ? '#059669' : cleanAiReport.eval_level.text?.includes('偏低') ? '#D97706' : '#DC2626',
-                          }}>
-                          评估等级: {cleanAiReport.eval_level.text}
+                    {/* 评估等级标签：以系统评分为准，与页眉评分卡同源，避免打架 */}
+                    {(scoreResult || cleanAiReport.eval_level) && (() => {
+                      const levelText = scoreResult?.level || cleanAiReport.eval_level?.text || '';
+                      const levelStd = scoreResult
+                        ? `系统综合评分 ${scoreResult.score}/${scoreResult.maxScore}`
+                        : cleanAiReport.eval_level?.standard;
+                      const isGood = /表现较好/.test(levelText);
+                      const isWarn = /(轻度关注|中度关注)/.test(levelText);
+                      return (
+                        <div className="flex items-center gap-3 mb-5 pb-4" style={{ borderBottom: '1px solid var(--border-light)' }}>
+                          <div className="px-4 py-2 rounded-lg text-sm font-bold"
+                            style={{
+                              background: isGood ? '#ECFDF5' : isWarn ? '#FFFBEB' : '#FEF2F2',
+                              color: isGood ? '#059669' : isWarn ? '#D97706' : '#DC2626',
+                            }}>
+                            评估等级: {levelText}
+                          </div>
+                          <div className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                            {levelStd}
+                          </div>
                         </div>
-                        <div className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                          {cleanAiReport.eval_level.standard}
-                        </div>
-                      </div>
-                    )}
+                      );
+                    })()}
 
                     <div className="space-y-3">
                       {/* 数据质量提醒 */}

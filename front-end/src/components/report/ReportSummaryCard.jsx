@@ -1,4 +1,12 @@
 import React from 'react';
+import InfoTooltip from './InfoTooltip';
+
+function breakdownColor(score, max) {
+  const pct = max > 0 ? score / max : 0;
+  if (pct >= 0.8) return '#059669';
+  if (pct >= 0.5) return '#D97706';
+  return '#DC2626';
+}
 
 function scoreBand(score, maxScore) {
   const pct = maxScore > 0 ? score / maxScore : 0;
@@ -26,8 +34,8 @@ export default function ReportSummaryCard({
   if (!scoreResult) return null;
 
   const band = scoreBand(scoreResult.score, scoreResult.maxScore || 25);
-  const indicators = scoreResult.indicators || [];
   const redFlags = scoreResult.redFlags || [];
+  const breakdown = Array.isArray(scoreResult.breakdown) ? scoreResult.breakdown : [];
 
   return (
     <section className="zeiss-card p-5" style={{ borderTop: `3px solid ${scoreResult.color || band.color}` }}>
@@ -65,14 +73,22 @@ export default function ReportSummaryCard({
             )}
           </div>
 
-          {indicators.length > 0 && (
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-3">
-              {indicators.map((item, index) => (
-                <div key={`${item.label}-${index}`} className="rounded-lg px-3 py-2" style={{ background: 'var(--bg-tertiary)', border: '1px solid var(--border-light)' }}>
-                  <div className="text-[10px] mb-0.5" style={{ color: 'var(--text-muted)' }}>{item.label}</div>
-                  <div className="text-sm font-bold truncate" style={{ color: 'var(--text-primary)' }}>{item.value}</div>
-                </div>
-              ))}
+          {breakdown.length > 0 && (
+            <div className="mb-3">
+              <div className="text-[11px] font-semibold mb-1.5" style={{ color: 'var(--text-secondary)' }}>评分明细</div>
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+                {breakdown.map((item, index) => (
+                  <div key={`${item.label}-${index}`} className="rounded-lg px-3 py-2" style={{ background: 'var(--bg-tertiary)', border: '1px solid var(--border-light)' }}>
+                    <div className="flex items-center gap-1 mb-0.5">
+                      <span className="text-[10px] truncate" style={{ color: 'var(--text-muted)' }}>{item.label}</span>
+                      <InfoTooltip text={item.help} iconColor="#C4C8CE" iconOpacity={1} />
+                    </div>
+                    <div className="text-sm font-bold" style={{ color: breakdownColor(item.score, item.max) }}>
+                      {item.score}<span className="text-[11px] font-bold" style={{ color: 'var(--text-muted)' }}>/{item.max}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
 

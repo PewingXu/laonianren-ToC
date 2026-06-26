@@ -597,8 +597,7 @@ function SymmetryBar({ leftTotal, rightTotal }) {
    报告目录
    ═══════════════════════════════════════════════════════════ */
 const SECTIONS = [
-  { id: 'overview',    label: '基本信息',     icon: '📋' },
-  { id: 'metrics',     label: '核心指标',     icon: '📊' },
+  { id: 'metrics',     label: '基本信息',     icon: '📋' },
   { id: 'cycle',       label: '周期分析',     icon: '🔄' },
   { id: 'symmetry',    label: '对称性分析',   icon: '⚖️' },
   { id: 'force',       label: '力-时间曲线',  icon: '📈' },
@@ -614,7 +613,7 @@ const SECTIONS = [
    主报告组件
    ═══════════════════════════════════════════════════════════ */
 export default function SitStandReport({ patientInfo, reportData: propsReportData, onClose, onAiReportReady }) {
-  const [activeSection, setActiveSection] = useState('overview');
+  const [activeSection, setActiveSection] = useState('metrics');
   const [reportData, setReportData] = useState(null);
   const [loading, setLoading] = useState(!propsReportData);
   const [aiReport, setAiReport] = useState(null);
@@ -797,10 +796,11 @@ export default function SitStandReport({ patientInfo, reportData: propsReportDat
 
   const totalDur = durationStats.total_duration || 0;
   // 防呆：若评分函数判定为数据无效，评估等级直接显示"数据异常"，不允许给"优秀/正常/偏慢"
+  // 分档与 V3 评分逻辑一致：≤10s 优秀 / 10-12s 正常 / 12-20s 偏慢 / >20s 异常
   const evalLevel = scoreResult?.invalid
     ? { text: '数据异常', color: C.red, bg: '#DC262615' }
-    : totalDur > 0 && totalDur < 12 ? { text: '优秀', color: C.green, bg: '#05966915' }
-    : totalDur <= 15 ? { text: '正常', color: C.cyan, bg: '#0891B215' }
+    : totalDur > 0 && totalDur <= 10 ? { text: '优秀', color: C.green, bg: '#05966915' }
+    : totalDur <= 12 ? { text: '正常', color: C.cyan, bg: '#0891B215' }
     : totalDur <= 20 ? { text: '偏慢', color: C.amber, bg: '#D9770615' }
     : { text: '异常', color: C.red, bg: '#DC262615' };
 
@@ -882,35 +882,8 @@ export default function SitStandReport({ patientInfo, reportData: propsReportDat
             />
 
             {/* ═══════════ 1. 基本信息 ═══════════ */}
-            <section id="ss-overview">
-              <SectionHeader title="基本信息" subtitle="Basic Information" />
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <div className="zeiss-card-inner p-4">
-                  <div className="text-[10px] mb-1" style={{ color: 'var(--text-muted)' }}>姓名</div>
-                  <div className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{patientInfo?.name || d.username || '---'}</div>
-                </div>
-                <div className="zeiss-card-inner p-4">
-                  <div className="text-[10px] mb-1" style={{ color: 'var(--text-muted)' }}>测试类型</div>
-                  <div className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>五次起坐测试</div>
-                </div>
-                <div className="zeiss-card-inner p-4">
-                  <div className="text-[10px] mb-1" style={{ color: 'var(--text-muted)' }}>测试时间</div>
-                  <div className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{d.test_date || fallbackDate}</div>
-                </div>
-                <div className="zeiss-card-inner p-4">
-                  <div className="text-[10px] mb-1" style={{ color: 'var(--text-muted)' }}>评估等级</div>
-                  <div className="flex items-center gap-2">
-                    <span className="px-2 py-0.5 rounded text-xs font-bold" style={{ background: evalLevel.bg, color: evalLevel.color }}>
-                      {evalLevel.text}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </section>
-
-            {/* ═══════════ 2. 核心指标 ═══════════ */}
             <section id="ss-metrics">
-              <SectionHeader title="核心指标" subtitle="Key Metrics" />
+              <SectionHeader title="基本信息" subtitle="Basic Information" />
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 <MetricCard label="总时长" value={`${totalDur.toFixed(1)}s`} color={C.blue}
                   sub={totalDur <= 15 ? '正常 (<15s)' : totalDur <= 20 ? '偏慢 (15-20s)' : '异常 (>20s)'} />
@@ -1191,6 +1164,7 @@ export default function SitStandReport({ patientInfo, reportData: propsReportDat
                   aiLoading={aiLoading}
                   aiError={aiError}
                   aiReport={aiReport}
+                  systemLevel={scoreResult ? { text: scoreResult.level, score: scoreResult.score, maxScore: scoreResult.maxScore } : null}
                   sections={ASSESSMENT_AI_SECTION_CONFIG.sitstand}
                   excludeKeys={['overview']}
                 />
