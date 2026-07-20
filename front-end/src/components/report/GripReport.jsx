@@ -5,6 +5,7 @@ import { exportToPdf } from '../../lib/pdfExport';
 import { sanitizeAiReport } from '../../lib/aiTextSanitizer';
 import ReportSummaryCard, { BasisNote } from './ReportSummaryCard';
 import { scoreGrip, scoreToAiContext } from '../../lib/assessmentScoring';
+import { AI_ENABLED } from '../../lib/featureFlags';
 
 /* ─── ECharts 图表封装 (蔡司风格) ─── */
 function EChart({ option, height = 280 }) {
@@ -32,7 +33,7 @@ const SECTIONS = [
   { id: 'angular', label: '抖动检测' },
   { id: 'time-analysis', label: '时间分析' },
   { id: 'peak-data', label: '峰值帧数据' },
-  { id: 'ai-assessment', label: 'AI分项分析' },
+  ...(AI_ENABLED ? [{ id: 'ai-assessment', label: 'AI分项分析' }] : []),
 ];
 
 /* ─── 默认空 fingers 数据（防止 undefined 崩溃）─── */
@@ -472,6 +473,7 @@ export default function GripReport({ patientName, patientInfo, onClose, reportDa
 
   // AI 综合评估：data 就绪后自动调用
   useEffect(() => {
+    if (!AI_ENABLED) return; // AI 停用：不发起请求
     if (!gripAiPayload || (aiReport && currentAiReportValid) || (propsReportData?.aiReport && cachedAiReportValid)) return;
     if (aiRequestStartedRef.current) return;
     aiRequestStartedRef.current = true;
@@ -737,8 +739,8 @@ export default function GripReport({ patientName, patientInfo, onClose, reportDa
             <ReportSummaryCard
               scoreResult={scoreResult}
               title="项目评分"
-              aiLoading={aiLoading}
-              aiIntro={currentAiReportValid ? cleanAiReport?.overview : ''}
+              aiLoading={AI_ENABLED && aiLoading}
+              aiIntro={AI_ENABLED && currentAiReportValid ? cleanAiReport?.overview : ''}
             />
 
             {/* 基本信息：总帧数移到不显眼位置，时间范围改为总时长 */}
@@ -889,7 +891,8 @@ export default function GripReport({ patientName, patientInfo, onClose, reportDa
               </div>
             </section>
 
-            {/* ═══════════ 综合评估（AI 生成） ═══════════ */}
+            {/* ═══════════ 综合评估（AI 生成，AI 停用时整块隐藏） ═══════════ */}
+            {AI_ENABLED && (
             <section id="grip-ai-assessment">
               <SectionHeader title="AI分项分析" />
               <div className="zeiss-card p-5">
@@ -1042,6 +1045,7 @@ export default function GripReport({ patientName, patientInfo, onClose, reportDa
                 )}
               </div>
             </section>
+            )}
 
             <div className="h-8" />
             <BasisNote className="pb-6 text-center" />

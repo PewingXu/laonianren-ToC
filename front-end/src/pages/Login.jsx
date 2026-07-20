@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useAssessment } from '../contexts/AssessmentContext';
 import { fetchLlmConfig } from '../lib/gripPythonApi';
 import { backendBridge } from '../lib/BackendBridge';
+import { AI_ENABLED } from '../lib/featureFlags';
 
 export default function Login() {
   const [secretKey, setSecretKey] = useState('');
@@ -200,6 +201,7 @@ export default function Login() {
               />
             </div>
 
+            {AI_ENABLED && (
             <div>
               <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-tertiary)' }}>
                 大模型的API-key
@@ -236,6 +238,7 @@ export default function Login() {
                 </button>
               </div>
             </div>
+            )}
 
             <button
               type="submit"

@@ -14,7 +14,7 @@ const C = {
 // ════════════════════════════════════════════════════════════════
 
 export const REPORT_BASIS_TEXT =
-  '依据说明：本系统采用"核心硬指标(72%) + 柔性触觉感知增强指标(28%)"的 V3 综合评分框架。核心硬指标依据《亚洲肌少症工作组（AWGS）2019 共识》及《社区老年人肌肉减少症筛查专家共识》：握力按性别阈值（男 28kg / 女 18kg）换算 R 值分层，5次起坐总时长分层（≤10s 为佳），日常步速分层（≥1.0m/s 为佳），静态站立结合四阶段平衡、COP 稳态与左右负荷偏移。增强指标利用本设备高密度压力传感特性（手指分区贡献、抓握稳定性、起坐周期稳定性、足底分区、COP 轨迹形态、步态对称性等）作辅助功能解释。本评分用于社区老年活动能力筛查、风险分层和干预建议生成，不作为疾病诊断依据。';
+  '依据说明：本系统采用"核心硬指标(72%) + 柔性触觉感知增强指标(28%)"的 V3 综合评分框架。核心硬指标依据《亚洲肌少症工作组（AWGS）2019 共识》及《社区老年人肌肉减少症筛查专家共识》：握力按性别阈值（男 28kg / 女 18kg）换算 R 值分层，3次起坐总时长分层（≤6s 为佳，档位由 5 次口径按比例换算），日常步速分层（≥1.0m/s 为佳），静态站立结合四阶段平衡、COP 稳态与左右负荷偏移。增强指标利用本设备高密度压力传感特性（手指分区贡献、抓握稳定性、起坐周期稳定性、足底分区、COP 轨迹形态、步态对称性等）作辅助功能解释。本评分用于社区老年活动能力筛查、风险分层和干预建议生成，不作为疾病诊断依据。';
 
 export const ASSESSMENT_LABELS = {
   grip: '握力',
@@ -338,13 +338,14 @@ export function extractSitStandMetrics(reportData = {}) {
   };
 }
 
-// 核心硬指标：5次起坐总时长（18 分）
+// 核心硬指标：3次起坐总时长（18 分）
+// 档位由 V3 表的 5 次口径（10/12/15/20s）按 3/5 比例缩放：6/7.2/9/12s【待现场标定】
 function sitstandCoreScore(totalDuration) {
   if (totalDuration <= 0) return 0;
-  if (totalDuration <= 10) return 18;
-  if (totalDuration <= 12) return 15;
-  if (totalDuration <= 15) return 10;
-  if (totalDuration <= 20) return 5;
+  if (totalDuration <= 6) return 18;
+  if (totalDuration <= 7.2) return 15;
+  if (totalDuration <= 9) return 10;
+  if (totalDuration <= 12) return 5;
   return 2;
 }
 
@@ -404,8 +405,8 @@ export function scoreSitStand(reportData) {
 
   // ============ 数据有效性硬性校验（防呆） ============
   const invalidReasons = [];
-  if (m.numCycles > 0 && m.numCycles < 3) invalidReasons.push(`完整周期数仅 ${m.numCycles} 次，未达到通常要求的 5 次完整起坐标准`);
-  if (m.totalDuration > 0 && m.totalDuration < 5) invalidReasons.push(`总时长 ${round(m.totalDuration, 1)}s 过短，未完成完整 5 次起坐`);
+  if (m.numCycles > 0 && m.numCycles < 2) invalidReasons.push(`完整起坐仅 ${m.numCycles} 次，未达到 3 次完整起坐的测试要求`);
+  if (m.totalDuration > 0 && m.totalDuration < 3) invalidReasons.push(`总时长 ${round(m.totalDuration, 1)}s 过短，未完成完整 3 次起坐`);
   if (m.maxCyclePeak === 0 && m.cyclePeakForces.length > 0) invalidReasons.push('各周期峰值力均为 0，力值检测异常，可能采集设备故障或信号丢失');
   if (m.maxCyclePeak > 0 && m.maxCyclePeak < 50) invalidReasons.push(`周期峰值力最大仅 ${round(m.maxCyclePeak, 1)}N，远低于正常起坐应有的力值`);
   // 起坐必须同时有坐垫(坐下)和足垫(站起)两路压力；缺任意一路即数据不完整，直接判数据异常
@@ -432,9 +433,9 @@ export function scoreSitStand(reportData) {
       indicators: [
         { label: '总时长', value: m.totalDuration ? `${round(m.totalDuration, 1)}s` : '--' },
         { label: '完成次数', value: m.numCycles ? `${m.numCycles}次` : '--' },
-        { label: '关注线', value: '>12s' },
+        { label: '关注线', value: '>7.2s' },
       ],
-      summary: '本次采集数据不足以反映真实起坐能力，建议检查压力传感设备是否正常连接，重新规范完成 5 次完整起坐测试。',
+      summary: '本次采集数据不足以反映真实起坐能力，建议检查压力传感设备是否正常连接，重新规范完成 3 次完整起坐测试。',
       redFlags: invalidReasons,
       priorityRisk: true,
       invalid: true,
@@ -453,8 +454,8 @@ export function scoreSitStand(reportData) {
   const score = Math.round(core + enhanced);
 
   const breakdown = [
-    { label: '5次起坐总时长（核心）', group: 'core', score: core, max: 18, desc: `${round(m.totalDuration, 1)}s`,
-      help: '5 次连续起坐的总耗时。≤10s=18分，10–12s=15，12–15s=10，15–20s=5，>20s 或需辅助=2，无法完成=0。与下肢功能/SPPB 相关。' },
+    { label: '3次起坐总时长（核心）', group: 'core', score: core, max: 18, desc: `${round(m.totalDuration, 1)}s`,
+      help: '3 次连续起坐的总耗时。≤6s=18分，6–7.2s=15，7.2–9s=10，9–12s=5，>12s 或需辅助=2，无法完成=0（档位由 5 次口径按比例换算）。与下肢功能/SPPB 相关。' },
     { label: '周期稳定性', group: 'enhanced', score: cycleStability.score, max: 2, desc: cycleStability.desc,
       help: '用每次起坐耗时的变异系数 CV=标准差/平均值 衡量节律是否一致。CV≤10%=2分，≤25%=1分，>25%=0分（逐次变慢或忽快忽慢）。' },
     { label: '左右负重对称性', group: 'enhanced', score: symmetry.score, max: 2, desc: symmetry.desc,
@@ -466,17 +467,17 @@ export function scoreSitStand(reportData) {
   ];
 
   const redFlags = [];
-  if (m.totalDuration > 12) redFlags.push('5次起坐时间超过 12s 身体功能关注阈值');
-  if (m.totalDuration > 20) redFlags.push('5次起坐超过 20s，坐站转移能力明显下降，建议进一步评估下肢肌力与衰弱风险');
+  if (m.totalDuration > 7.2) redFlags.push('3次起坐时间超过 7.2s 身体功能关注阈值（对应 5 次口径 12s）');
+  if (m.totalDuration > 12) redFlags.push('3次起坐超过 12s，坐站转移能力明显下降，建议进一步评估下肢肌力与衰弱风险');
   if (m.numCycles > 0 && m.numCycles < 5) redFlags.push(`有效起坐次数为 ${m.numCycles} 次，建议复核完整性`);
   if (symmetry.score === 0) redFlags.push('起坐过程明显偏向一侧，提示偏侧代偿');
   if (forceCurve.score === 0) redFlags.push('起身力曲线反复震荡，提示启动迟滞或代偿（晃身攒劲/多次起身），建议关注下肢爆发力与动作模式');
 
   const summary = score >= 20
-    ? `5次起坐总时长约 ${round(m.totalDuration, 1)}s（核心 ${core}/18 + 增强 ${enhanced}/7），下肢起身能力与动作质量整体尚可。`
+    ? `3次起坐总时长约 ${round(m.totalDuration, 1)}s（核心 ${core}/18 + 增强 ${enhanced}/7），下肢起身能力与动作质量整体尚可。`
     : score >= 15
-      ? `5次起坐总时长约 ${round(m.totalDuration, 1)}s（核心 ${core}/18 + 增强 ${enhanced}/7），接近或超过关注线，提示下肢力量与动作效率需观察。`
-      : `5次起坐总时长约 ${round(m.totalDuration, 1)}s（核心 ${core}/18 + 增强 ${enhanced}/7），起身速度偏慢或动作质量下降，提示下肢功能下降风险需要重点关注。`;
+      ? `3次起坐总时长约 ${round(m.totalDuration, 1)}s（核心 ${core}/18 + 增强 ${enhanced}/7），接近或超过关注线，提示下肢力量与动作效率需观察。`
+      : `3次起坐总时长约 ${round(m.totalDuration, 1)}s（核心 ${core}/18 + 增强 ${enhanced}/7），起身速度偏慢或动作质量下降，提示下肢功能下降风险需要重点关注。`;
 
   return makeResult({
     type: 'sitstand',
@@ -487,13 +488,13 @@ export function scoreSitStand(reportData) {
       { label: '总时长', value: m.totalDuration ? `${round(m.totalDuration, 1)}s` : '--' },
       { label: '完成次数', value: m.numCycles ? `${m.numCycles}次` : '--' },
       { label: '核心/增强', value: `${core}/18 + ${enhanced}/7` },
-      { label: '关注线', value: '>12s' },
+      { label: '关注线', value: '>7.2s' },
     ],
     summary,
     redFlags,
-    priorityRisk: m.totalDuration > 12,
+    priorityRisk: m.totalDuration > 7.2,
     breakdown,
-    note: 'V3 起坐评分 = 核心 18 分（≤10s=18，10–12s=15，12–15s=10，15–20s=5，>20s=2）+ 增强 7 分（周期稳定性 2 + 左右负重对称 2 + 坐站压力变化曲线 2 + 重心转移 1）。坐站压力变化曲线用力-时间曲线平滑度判断"启动顺畅、曲线平滑 vs 迟滞/代偿"：总变差/净变化比 ≤1.15=2分（一气呵成），≤1.40=1分，>1.40=0分（反复震荡/代偿）。该比值与帧率、力幅度均无关。',
+    note: 'V3 起坐评分（3 次口径，档位由 5 次表按 3/5 比例换算）= 核心 18 分（≤6s=18，6–7.2s=15，7.2–9s=10，9–12s=5，>12s=2）+ 增强 7 分（周期稳定性 2 + 左右负重对称 2 + 坐站压力变化曲线 2 + 重心转移 1）。坐站压力变化曲线用力-时间曲线平滑度判断"启动顺畅、曲线平滑 vs 迟滞/代偿"：总变差/净变化比 ≤1.15=2分（一气呵成），≤1.40=1分，>1.40=0分（反复震荡/代偿）。该比值与帧率、力幅度均无关。',
   });
 }
 
@@ -993,7 +994,7 @@ const COMPREHENSIVE_IMPACTS = {
   grip: '握力反映上肢肌力和整体肌肉力量储备，下降时可能影响提物、扶撑、起身辅助和跌倒后的自我保护能力',
   gait: '步态主要反映日常行走效率和左右对称性，下降时可能影响外出、转身、上下楼梯和过马路安全',
   standing: '静态站立反映重心控制、左右负荷和防跌倒基础，异常时在起夜、转身、湿滑地面或长时间站立时更需要小心',
-  sitstand: '五次起坐反映下肢力量、坐下控制和日常转移能力，下降时可能影响如厕、从椅子起身、上下楼和疲劳耐受',
+  sitstand: '三次起坐反映下肢力量、坐下控制和日常转移能力，下降时可能影响如厕、从椅子起身、上下楼和疲劳耐受',
 };
 
 const COMPREHENSIVE_LEVEL_GUIDANCE = {

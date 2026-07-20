@@ -3,6 +3,7 @@ import {
   generateStandingAIReport,
   generateGaitAIReport,
 } from './gripPythonApi';
+import { AI_ENABLED } from './featureFlags';
 
 export const ASSESSMENT_AI_SECTION_CONFIG = {
   sitstand: [
@@ -199,6 +200,7 @@ export function buildGaitAiPayload(reportData) {
 }
 
 export async function requestAssessmentAIReport(type, patientInfo, assessmentData) {
+  if (!AI_ENABLED) return null; // AI 停用：不发起任何请求
   switch (type) {
     case 'sitstand':
       return generateSitStandAIReport(patientInfo, assessmentData);

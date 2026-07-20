@@ -2729,6 +2729,30 @@ app.post('/getDbHeatmap', async (req, res) => {
   }
 })
 
+// ============ CSV 导入生成报告（评分排名用；隔离新链路，不改采集主流程）============
+// 前端负责：解析 csv + 按 type/region 提取数据与地区预处理，组装好算法入参 algoInput 后 POST 到这里。
+// 后端只按 type 调用对应算法，返回 render_data（结构与采集主流程一致，前端可直接当 reportData）。
+const IMPORT_ALGO_FN = {
+  grip: 'generate_grip_render_report',
+  sitstand: 'generate_sit_stand_render_report',
+  standing: 'generate_standing_render_report',
+  gait: 'generate_gait_render_report',
+}
+app.post('/importCsvReport', async (req, res) => {
+  try {
+    const { type, algoInput } = req.body || {}
+    const fn = IMPORT_ALGO_FN[type]
+    if (!fn || !algoInput || typeof algoInput !== 'object') {
+      return res.json(new HttpResult(1, {}, 'bad import request: need type + algoInput'))
+    }
+    const renderData = await callAlgorithm(fn, algoInput)
+    res.json(new HttpResult(0, { render_data: renderData }, 'success'))
+  } catch (e) {
+    console.error('/importCsvReport failed:', e)
+    res.json(new HttpResult(1, {}, 'importCsvReport failed: ' + (e && e.message ? e.message : String(e))))
+  }
+})
+
 app.post('/getContrastData', async (req, res) => {
   const { left, right } = req.body
 

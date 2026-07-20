@@ -311,6 +311,21 @@ class BackendBridge {
     return `${this.httpUrl}/downloadCsvFile/${encodeURIComponent(fileName)}`;
   }
 
+  /**
+   * CSV 导入生成报告（评分排名用）：前端组装好算法入参后调用，后端调对应算法返回 render_data
+   * @param {string} type - grip | sitstand | standing | gait
+   * @param {object} algoInput - 与采集主流程 callAlgorithm 一致的入参
+   * @returns {Promise<object>} { code, data: { render_data }, msg }
+   */
+  async importCsvReport(type, algoInput) {
+    const res = await fetch(`${this.httpUrl}/importCsvReport`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type, algoInput }),
+    });
+    return res.json();
+  }
+
   /* ─── 历史记录 API ─── */
 
   /**

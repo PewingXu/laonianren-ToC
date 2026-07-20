@@ -11,6 +11,7 @@ import {
   buildStandingAiPayload,
 } from '../../lib/assessmentAi';
 import { scoreStanding, scoreToAiContext } from '../../lib/assessmentScoring';
+import { AI_ENABLED } from '../../lib/featureFlags';
 
 /* ─── 蔡司风格 EChart 封装（增量更新，避免闪烁） ─── */
 function EChart({ option, height = 280 }) {
@@ -41,14 +42,14 @@ const SECTIONS = [
   { id: 'cop-velocity', label: 'COP 速度与加速度' },
   { id: 'cop-params', label: 'COP 参数' },
   { id: 'annotation', label: '医师注释' },
-  { id: 'summary', label: 'AI分项分析' },
+  ...(AI_ENABLED ? [{ id: 'summary', label: 'AI分项分析' }] : []),
 ];
 
 const STANDING_SPACING_MM = 14;
 const STANDING_SPACING_CM = STANDING_SPACING_MM / 10;
 
 export default function StandingReport({ reportData, patientInfo, onClose, onAiReportReady }) {
-  const [activeSection, setActiveSection] = useState('summary');
+  const [activeSection, setActiveSection] = useState(AI_ENABLED ? 'summary' : 'overview');
   const [aiReport, setAiReport] = useState(null);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState(null);
@@ -435,6 +436,7 @@ export default function StandingReport({ reportData, patientInfo, onClose, onAiR
   }, [data, reportData?.aiReport]);
 
   useEffect(() => {
+    if (!AI_ENABLED) return; // AI 停用：不发起请求
     if (!data || aiReport || reportData?.aiReport) return;
     if (aiRequestStartedRef.current) return;
     aiRequestStartedRef.current = true;
@@ -873,6 +875,7 @@ export default function StandingReport({ reportData, patientInfo, onClose, onAiR
               </div>
             </section>
 
+            {AI_ENABLED && (
             <section id="standing-summary">
               <SectionHeader title="AI分项分析" subtitle="AI Sub-Analysis" />
               <div className="zeiss-card p-5">
@@ -886,6 +889,7 @@ export default function StandingReport({ reportData, patientInfo, onClose, onAiR
                 />
               </div>
             </section>
+            )}
 
             <div className="h-8" />
             <BasisNote className="pb-6 text-center" />

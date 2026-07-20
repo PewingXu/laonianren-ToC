@@ -10,6 +10,7 @@ import {
   requestAssessmentAIReport,
 } from '../../lib/assessmentAi';
 import { scoreSitStand, scoreToAiContext } from '../../lib/assessmentScoring';
+import { AI_ENABLED } from '../../lib/featureFlags';
 
 /* ═══════════════════════════════════════════════════════════
    样式常量 & 工具
@@ -606,7 +607,7 @@ const SECTIONS = [
   { id: 'sit-evo',     label: '坐姿压力演变', icon: '🪑' },
   { id: 'sit-cop',     label: '坐姿COP轨迹', icon: '🎯' },
   { id: 'pressure',    label: '压力统计',     icon: '📉' },
-  { id: 'conclusion',  label: 'AI分项分析',   icon: '✅' },
+  ...(AI_ENABLED ? [{ id: 'conclusion', label: 'AI分项分析', icon: '✅' }] : []),
 ];
 
 /* ═══════════════════════════════════════════════════════════
@@ -686,6 +687,7 @@ export default function SitStandReport({ patientInfo, reportData: propsReportDat
   };
 
   useEffect(() => {
+    if (!AI_ENABLED) return; // AI 停用：不发起请求
     if (!reportData || aiReport || reportData.aiReport) return;
     if (aiRequestStartedRef.current) return;
     aiRequestStartedRef.current = true;
@@ -834,7 +836,7 @@ export default function SitStandReport({ patientInfo, reportData: propsReportDat
       <div className="shrink-0 px-4 md:px-6 py-3 flex items-center justify-between"
         style={{ borderBottom: '1px solid var(--border-light)', background: 'var(--bg-secondary)' }}>
         <h2 className="text-sm md:text-base font-bold" style={{ color: 'var(--text-primary)' }}>
-          {patientInfo?.name || d.username || '---'} 的五次起坐评估报告
+          {patientInfo?.name || d.username || '---'} 的三次起坐评估报告
         </h2>
         <div className="flex items-center gap-2 md:gap-3 text-xs" style={{ color: 'var(--text-tertiary)' }}>
           {patientInfo?.gender && <span>性别：{patientInfo.gender}</span>}
@@ -1156,7 +1158,8 @@ export default function SitStandReport({ patientInfo, reportData: propsReportDat
               )}
             </section>
 
-            {/* ═══════════ 11. 综合评估 ═══════════ */}
+            {/* ═══════════ 11. 综合评估（AI 停用时隐藏） ═══════════ */}
+            {AI_ENABLED && (
             <section id="ss-conclusion">
               <SectionHeader title="AI分项分析" subtitle="AI Sub-Analysis" />
               <div className="zeiss-card p-5 mb-4">
@@ -1170,6 +1173,7 @@ export default function SitStandReport({ patientInfo, reportData: propsReportDat
                 />
               </div>
             </section>
+            )}
 
             <BasisNote className="pb-6 text-center" />
           </div>

@@ -13,6 +13,7 @@ import PressureEvolutionChart from '../../components/ui/PressureEvolutionChart';
 import { exportToPdf } from '../../lib/pdfExport';
 import AssessmentAiPanel from '../../components/report/AssessmentAiPanel';
 import ReportSummaryCard, { BasisNote } from '../../components/report/ReportSummaryCard';
+import { AI_ENABLED } from '../../lib/featureFlags';
 import { sanitizeAiReport } from '../../lib/aiTextSanitizer';
 import {
   ASSESSMENT_AI_SECTION_CONFIG,
@@ -159,7 +160,7 @@ export function GaitReportContent({ patientInfo, pythonResult: externalResult, o
     { id: 'partcurves', title: '8. 分区曲线' },
     { id: 'support', title: '9. 单脚支撑相' },
     { id: 'cycle', title: '10. 步态周期' },
-    { id: 'conclusion', title: 'AI分项分析' },
+    ...(AI_ENABLED ? [{ id: 'conclusion', title: 'AI分项分析' }] : []),
   ];
   const [activeSection, setActiveSection] = useState('spatiotemporal');
   const scrollToSection = (id) => {
@@ -344,6 +345,7 @@ export function GaitReportContent({ patientInfo, pythonResult: externalResult, o
   }, [aiPayload, externalResult?.aiReport]);
 
   useEffect(() => {
+    if (!AI_ENABLED) return; // AI 停用：不发起请求
     if (!aiPayload || aiReport || externalResult?.aiReport) return;
     if (aiRequestStartedRef.current) return;
     aiRequestStartedRef.current = true;
@@ -451,8 +453,8 @@ export function GaitReportContent({ patientInfo, pythonResult: externalResult, o
         <ReportSummaryCard
           scoreResult={scoreResult}
           title="项目评分"
-          aiLoading={aiLoading}
-          aiIntro={cleanAiReport?.overview}
+          aiLoading={AI_ENABLED && aiLoading}
+          aiIntro={AI_ENABLED ? cleanAiReport?.overview : ''}
         />
 
         {/* 1. 步态时空参数 */}
@@ -685,7 +687,8 @@ export function GaitReportContent({ patientInfo, pythonResult: externalResult, o
           </div>
         </section>
 
-        {/* 综合评估 */}
+        {/* 综合评估（AI 停用时隐藏） */}
+        {AI_ENABLED && (
         <section id="gait-conclusion">
           <div className="zeiss-section-title">AI分项分析</div>
           <div className="zeiss-card-inner p-5 mt-3">
@@ -699,6 +702,7 @@ export function GaitReportContent({ patientInfo, pythonResult: externalResult, o
             />
           </div>
         </section>
+        )}
         <BasisNote className="pb-6 text-center" />
       </div>
     </div>

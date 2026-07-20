@@ -1,7 +1,12 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAssessment } from '../contexts/AssessmentContext';
-import { searchHistory, deleteRecord, clearHistory } from '../lib/historyService';
+import { searchHistory, deleteRecord, clearHistory, saveAssessmentSession } from '../lib/historyService';
+import { backendBridge } from '../lib/BackendBridge';
+import { prepareImport, extractCsvSheetsFromXlsx, TYPE_LABEL } from '../lib/csvImport';
+import { REGION_LABEL } from '../lib/deviceRegion';
+import { addScore, getRankIncludingSelf, getCount, clearDistribution } from '../lib/scoreRanking';
+import { buildComprehensiveScoreResult } from '../lib/assessmentScoring';
 
 const ASSESSMENT_LABELS = {
   grip: '握力评估',
@@ -56,6 +61,14 @@ export default function AssessmentHistory() {
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
 
+  // CSV 导入 / 排名
+  const fileInputRef = useRef(null);
+  const importModeRef = useRef('base'); // 'base'=导入基础库 | 'eval'=导入测评（与基础比排名）
+  const [importRegion, setImportRegion] = useState('guangzhou');
+  const [busy, setBusy] = useState(false);       // 导入/生成进行中
+  const [busyMsg, setBusyMsg] = useState('');
+  const [rankMap, setRankMap] = useState({});    // recordId -> { [type]: {percent, total, ...} }
+
   // 异步加载数据
   useEffect(() => {
     let cancelled = false;
@@ -106,6 +119,202 @@ export default function AssessmentHistory() {
     navigate(`/history/report?id=${recordId}&type=${type}`);
   };
 
+  // ─── CSV 批量导入（评分排名用；每个 csv = 一位受试者的一个项目）───
+  const readFileText = (file) => new Promise((resolve, reject) => {
+    const fr = new FileReader();
+    fr.onload = () => resolve(String(fr.result || ''));
+    fr.onerror = () => reject(fr.error || new Error('读取文件失败'));
+    fr.readAsText(file);
+  });
+
+  /**
+   * 全量重算：按当前【全部】历史记录重建频次表（幂等，重复导入不会重复计分），
+   * 并计算每条记录各项/综合的"超越百分比"（同分排前、分母含本人）。
+   */
+  const recalcAllScores = useCallback(async () => {
+    const all = await searchHistory({ keyword: '', date: '', page: 1, pageSize: 100000 });
+    const records = all.items || [];
+    clearDistribution();
+    const perRecord = [];
+    for (const rec of records) {
+      const patient = { name: rec.patientName, gender: rec.patientGender || '男', age: rec.patientAge, weight: rec.patientWeight };
+      const comp = buildComprehensiveScoreResult(rec.assessments || {}, patient);
+      const itemScores = {};
+      (comp.itemResults || []).forEach(it => {
+        if (rec.assessments?.[it.type]?.completed && !it.invalid && it.score > 0) {
+          itemScores[it.type] = it.score;
+          addScore(it.type, it.score);
+        }
+      });
+      const completeAll = ASSESSMENT_KEYS.every(t => rec.assessments?.[t]?.completed);
+      if (completeAll) {
+        itemScores.comprehensive = comp.score;
+        addScore('comprehensive', comp.score);
+      }
+      perRecord.push({ id: rec.id, sessionId: rec.sessionId, name: rec.patientName, itemScores });
+    }
+    // 频次表建完后再算每人的排名（相对其他所有人）
+    const nextRank = {};
+    for (const r of perRecord) {
+      const ranks = {};
+      for (const type in r.itemScores) {
+        ranks[type] = { score: r.itemScores[type], ...getRankIncludingSelf(type, r.itemScores[type]) };
+      }
+      nextRank[r.id] = ranks;
+    }
+    setRankMap(nextRank);
+    return { records, perRecord, nextRank };
+  }, []);
+
+  // 进入历史页 / 数据变动后自动重算排名徽章（rankMap 是内存态，刷新后会丢失；
+  // 全量重算毫秒级且幂等，同时保证删除记录后频次表同步更新）
+  useEffect(() => {
+    recalcAllScores().catch(err => console.error('自动重算排名失败:', err));
+  }, [recalcAllScores, refreshKey]);
+
+  const handleFilesSelected = useCallback(async (e) => {
+    const files = Array.from(e.target.files || []);
+    e.target.value = '';
+    if (!files.length) return;
+    const mode = importModeRef.current; // 'base'=导入基础库 | 'eval'=导入测评
+    setBusy(true);
+    let ok = 0;
+    const errors = [];
+    const subjectKeys = new Set(); // 本次导入涉及的受试者
+
+    // 导入一份 csv 文本（csv 文件或 xlsx 的一个 sheet 均走此函数）
+    const importOneCsvText = async (csvText, subjectKey, displayName) => {
+      const { type, algoInput } = prepareImport(csvText, importRegion, displayName);
+      let renderData = null;
+      if (type === 'grip') {
+        // 握力：左右手分别调算法，再包装成与采集端点 /getHandPdf 一致的结构。
+        // 单手失败不整体失败（与端点一致：失败的手为 null，另一只照常出报告）
+        const callHand = async (input) => {
+          if (!input) return null;
+          try {
+            const r = await backendBridge.importCsvReport('grip', input);
+            if (r?.code !== 0 || !r?.data?.render_data) return null;
+            return r.data.render_data;
+          } catch { return null; }
+        };
+        const left = await callHand(algoInput.left);
+        const right = await callHand(algoInput.right);
+        if (!left && !right) throw new Error('未生成任何一只手的报告');
+        renderData = { left, right, activeHand: left ? 'left' : 'right' };
+      } else {
+        const resp = await backendBridge.importCsvReport(type, algoInput);
+        if (resp?.code !== 0 || !resp?.data?.render_data) {
+          throw new Error(resp?.msg || '后端未返回报告数据');
+        }
+        renderData = resp.data.render_data;
+      }
+
+      const assessments = {
+        [type]: {
+          completed: true,
+          report: { reportData: renderData },
+          completedAt: new Date().toISOString(),
+        },
+      };
+      const patient = { name: displayName, gender: '男', age: '', weight: '' };
+      await saveAssessmentSession(patient, `${REGION_LABEL[importRegion]}·导入`, assessments, `import_${subjectKey}`);
+      subjectKeys.add(subjectKey);
+      return type;
+    };
+
+    for (const file of files) {
+      setBusyMsg(`正在导入 ${file.name} ...`);
+      const isExcel = /\.xlsx?$/i.test(file.name);
+      try {
+        if (isExcel) {
+          // Excel 工作簿（广州版“批量导出数据”格式）：一个文件 = 一位受试者，每个 sheet = 一个项目。
+          // 受试者键用完整基名（去掉尾部“_四项评估数据”），同名不同编号的人不会混；显示姓名取第一段。
+          const baseName = file.name.replace(/\.xlsx?$/i, '').replace(/_四项评估数据$/, '');
+          const subjectKey = baseName;
+          const displayName = (baseName.split(/[_\-（(]/)[0] || baseName).trim() || baseName;
+          const buf = await new Promise((resolve, reject) => {
+            const fr = new FileReader();
+            fr.onload = () => resolve(fr.result);
+            fr.onerror = () => reject(fr.error || new Error('读取文件失败'));
+            fr.readAsArrayBuffer(file);
+          });
+          const sheets = await extractCsvSheetsFromXlsx(buf);
+          if (!sheets.length) throw new Error('Excel 中没有可用的数据表');
+          for (const { sheetName, csvText } of sheets) {
+            setBusyMsg(`正在导入 ${file.name} · ${sheetName} ...`);
+            try {
+              await importOneCsvText(csvText, subjectKey, displayName);
+              ok++;
+            } catch (err) {
+              errors.push(`${file.name}[${sheetName}]：${err.message}`);
+            }
+          }
+        } else {
+          // CSV：每个文件 = 一位受试者的一个项目；按文件名前缀归组（张三_步态.csv → 张三）
+          const text = await readFileText(file);
+          const baseName = file.name.replace(/\.csv$/i, '');
+          const subjectKey = (baseName.split(/[_\-（(]/)[0] || baseName).trim() || baseName;
+          await importOneCsvText(text, subjectKey, subjectKey);
+          ok++;
+        }
+      } catch (err) {
+        errors.push(`${file.name}：${err.message}`);
+      }
+    }
+
+    // 导入完成 → 全量重算频次表与排名（幂等）
+    let summary = '';
+    if (ok > 0) {
+      setBusyMsg('正在计算评分与排名...');
+      try {
+        const { perRecord } = await recalcAllScores();
+        if (mode === 'eval') {
+          // 测评模式：报告本次导入的每位受试者打败了多少人
+          const lines = [];
+          for (const key of subjectKeys) {
+            const rec = perRecord.find(r => r.sessionId === `import_${key}` || r.name === key);
+            if (!rec) continue;
+            const parts = Object.entries(rec.itemScores).map(([type, score]) => {
+              const rk = getRankIncludingSelf(type, score);
+              const label = type === 'comprehensive' ? '综合' : TYPE_LABEL[type];
+              const max = type === 'comprehensive' ? 100 : 25;
+              return `${label} ${score}/${max}·超越${rk.percent.toFixed(1)}%`;
+            });
+            lines.push(`${key}：${parts.join('；') || '无有效得分'}`);
+          }
+          summary = `\n\n── 测评结果 ──\n${lines.join('\n')}`;
+        } else {
+          // 基础库模式：报告基础库规模
+          const counts = ASSESSMENT_KEYS.map(t => `${TYPE_LABEL[t]}${getCount(t)}人`).join('、');
+          summary = `\n\n基础库现有：${counts}、综合${getCount('comprehensive')}人`;
+        }
+      } catch (err) {
+        summary = `\n\n评分排名计算失败：${err.message}`;
+      }
+    }
+
+    setBusy(false);
+    setBusyMsg('');
+    setRefreshKey(k => k + 1);
+    alert(`导入完成：成功 ${ok} 个${errors.length ? `，失败 ${errors.length} 个\n${errors.slice(0, 6).join('\n')}` : ''}${summary}`);
+  }, [importRegion, recalcAllScores]);
+
+  // ─── 重算排名（维护键）：按当前全部记录幂等重建频次表 + 全部排名 ───
+  const handleRecalcRank = useCallback(async () => {
+    if (busy) return;
+    setBusy(true);
+    setBusyMsg('正在计算评分与排名...');
+    try {
+      const { records } = await recalcAllScores();
+      alert(`已根据 ${records.length} 条记录重建评分基础库并计算排名，展开任意记录可查看“超越百分比”。`);
+    } catch (err) {
+      alert('计算失败：' + err.message);
+    } finally {
+      setBusy(false);
+      setBusyMsg('');
+    }
+  }, [busy, recalcAllScores]);
+
   return (
     <div className="min-h-screen w-full flex flex-col" style={{ background: 'var(--bg-primary)' }}>
       {/* Header */}
@@ -147,6 +356,33 @@ export default function AssessmentHistory() {
               </span>
             </div>
             <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+              <input ref={fileInputRef} type="file" accept=".csv,.xlsx,.xls" multiple className="hidden" onChange={handleFilesSelected} />
+              <select value={importRegion} onChange={e => setImportRegion(e.target.value)}
+                className="zeiss-input py-2 text-sm" style={{ width: 92 }} title="导入数据的设备地区（决定线序预处理）">
+                <option value="guangzhou">广州</option>
+                <option value="beijing">北京</option>
+              </select>
+              <button onClick={() => { if (busy) return; importModeRef.current = 'base'; fileInputRef.current?.click(); }} disabled={busy}
+                title="批量导入一批 csv：生成报告 + 算分入库，构成排名基础人群"
+                className="text-xs px-3 py-2 rounded-lg font-semibold transition-colors"
+                style={{ color: '#0891B2', background: '#ECFEFF', border: '1px solid #0891B233', cursor: busy ? 'not-allowed' : 'pointer', opacity: busy ? 0.6 : 1 }}>
+                导入基础库
+              </button>
+              <button onClick={() => { if (busy) return; importModeRef.current = 'eval'; fileInputRef.current?.click(); }} disabled={busy}
+                title="导入新受试者 csv：生成报告 + 算分，与基础库比出“超越百分比”，本人也计入基础"
+                className="text-xs px-3 py-2 rounded-lg font-semibold transition-colors"
+                style={{ color: 'white', background: 'linear-gradient(135deg, #0066CC, #0891B2)', border: 'none', cursor: busy ? 'not-allowed' : 'pointer', opacity: busy ? 0.6 : 1 }}>
+                导入测评
+              </button>
+              <button onClick={handleRecalcRank} disabled={busy}
+                title="按当前全部历史记录重建评分基础库并重算所有排名（幂等，可反复点）"
+                className="text-xs px-3 py-2 rounded-lg font-semibold transition-colors"
+                style={{ color: '#0066CC', background: '#EFF6FF', border: '1px solid #0066CC22', cursor: busy ? 'not-allowed' : 'pointer', opacity: busy ? 0.6 : 1 }}>
+                重算排名
+              </button>
+              {busy && busyMsg && (
+                <span className="text-xs" style={{ color: 'var(--text-muted)' }}>{busyMsg}</span>
+              )}
               <input type="date" value={dateFilter} onChange={e => setDateFilter(e.target.value)}
                 className="zeiss-input py-2 text-sm" style={{ width: 160 }} />
               <input type="text" placeholder="搜索姓名或机构" value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
@@ -288,6 +524,13 @@ export default function AssessmentHistory() {
                                 {!completed && (
                                   <p className="text-[11px] mb-3" style={{ color: 'var(--text-muted)' }}>暂未完成此项评估</p>
                                 )}
+                                {/* 排名徽章（一键生成后显示） */}
+                                {completed && rankMap[item.id]?.[key] && (
+                                  <div className="mb-2 px-2.5 py-1.5 rounded-lg text-[11px] font-medium text-center"
+                                    style={{ background: '#ECFEFF', color: '#0891B2', border: '1px solid #0891B233' }}>
+                                    评分 {rankMap[item.id][key].score}/25 · 超越 {rankMap[item.id][key].percent.toFixed(1)}%
+                                  </div>
+                                )}
                                 {/* 查看报告按钮 */}
                                 {completed ? (
                                   <button
@@ -313,6 +556,13 @@ export default function AssessmentHistory() {
                         {/* 一键操作区 */}
                         {getCompletedCount(item.assessments) > 0 && (
                           <div className="mt-3 flex items-center gap-3 flex-wrap">
+                            {/* 综合排名徽章（一键生成后、且四项齐全时显示） */}
+                            {rankMap[item.id]?.comprehensive && (
+                              <span className="text-xs px-3 py-2 rounded-lg font-semibold"
+                                style={{ background: '#EFF6FF', color: '#0066CC', border: '1px solid #0066CC22' }}>
+                                综合 {rankMap[item.id].comprehensive.score}/100 · 超越 {rankMap[item.id].comprehensive.percent.toFixed(1)}%
+                              </span>
+                            )}
                             {/* 综合报告按钮 */}
                             <button
                               onClick={(e) => {
@@ -338,7 +588,7 @@ export default function AssessmentHistory() {
                                 });
                               }}
                               className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold transition-all"
-                              style={{ color: '#DC2626', background: '#FEF2F2', border: '1px solid #FCA5A530', cursor: 'pointer' }}>
+                              style={{ color: '#0891B2', background: '#ECFEFF', border: '1px solid #0891B233', cursor: 'pointer' }}>
                               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                               </svg>

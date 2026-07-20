@@ -5,6 +5,7 @@
  */
 
 import { sanitizeAiReport } from './aiTextSanitizer';
+import { AI_ENABLED } from './featureFlags';
 
 const DIRECT_PYTHON_API_BASE = 'http://127.0.0.1:8765';
 const PYTHON_API_BASE_CANDIDATES = [
@@ -269,6 +270,7 @@ export async function analyzeStandingCSV(csvContent, fps = 42, thresholdRatio = 
 }
 
 export async function generateGripAIReport(patientInfo, gripData) {
+  if (!AI_ENABLED) return null; // AI 停用：不发起任何请求
   return postAiReport('/generate-grip-ai-report', withOptionalLlmApiKey({
     patient_info: patientInfo,
     grip_data: gripData,
@@ -297,6 +299,7 @@ export async function generateGaitAIReport(patientInfo, assessmentData) {
 }
 
 export async function streamGripAIReport(patientInfo, gripData, onChunk) {
+  if (!AI_ENABLED) return; // AI 停用：不发起任何请求
   try {
     const payload = JSON.stringify(withOptionalLlmApiKey({
       patient_info: patientInfo,

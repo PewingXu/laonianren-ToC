@@ -12,7 +12,7 @@ import { buildComprehensiveScoreResult } from '../../lib/assessmentScoring';
 /* ─── 常量 ─── */
 const ASSESSMENT_LABELS = {
   grip: '握力评估',
-  sitstand: '五次起坐评估',
+  sitstand: '三次起坐评估',
   standing: '静态站立评估',
   gait: '行走步态评估',
 };
@@ -50,11 +50,12 @@ function evalGripLevel(totalForce, gender) {
   return { text: '低握力', color: C.red, bg: '#FEF2F2' };
 }
 
+// 3 次起坐口径（阈值由 5 次表按 3/5 比例换算：12/15/20s → 7.2/9/12s）
 function evalSitStandLevel(totalDur) {
-  if (totalDur > 0 && totalDur < 12) return { text: '优秀', color: C.green, bg: '#ECFDF5' };
-  if (totalDur <= 15) return { text: '需关注', color: C.amber, bg: '#FFFBEB' };
-  if (totalDur <= 20) return { text: '偏慢', color: C.amber, bg: '#FFFBEB' };
-  return { text: '明显偏慢', color: C.red, bg: '#FEF2F2' };
+  if (totalDur > 0 && totalDur < 7.2) return { text: '表现较好', color: C.green, bg: '#ECFDF5' };
+  if (totalDur <= 9) return { text: '轻度关注', color: C.amber, bg: '#FFFBEB' };
+  if (totalDur <= 12) return { text: '中度关注', color: C.amber, bg: '#FFFBEB' };
+  return { text: '重点关注', color: C.red, bg: '#FEF2F2' };
 }
 
 function evalGaitLevel(walkSpeed) {
@@ -494,7 +495,7 @@ export default function ComprehensiveReport({ record, onClose }) {
           {/* ═══ 3. 起坐评估摘要 ═══ */}
           {sitstandData && (
             <section id="comp-sitstand">
-              <div className="zeiss-section-title">五次起坐评估摘要</div>
+              <div className="zeiss-section-title">三次起坐评估摘要</div>
               <div className="zeiss-card p-5">
                 {itemScoreMap.sitstand && (
                   <div className="mb-4 p-3 rounded-lg text-xs font-semibold"
@@ -530,7 +531,7 @@ export default function ComprehensiveReport({ record, onClose }) {
                 )}
                 <div className="mt-3 p-3 rounded-lg text-xs" style={{ background: evalSitStandLevel(sitstandData.totalDuration).bg }}>
                   <span style={{ color: evalSitStandLevel(sitstandData.totalDuration).color }}>
-                    依据 AWGS 2019 及社区筛查共识，五次起坐测试 ≥12s 提示身体功能需关注。总时长 <b>{sitstandData.totalDuration.toFixed(1)}s</b>，
+                    依据 AWGS 2019 及社区筛查共识（5 次口径 ≥12s，按 3 次换算 ≥7.2s）提示身体功能需关注。总时长 <b>{sitstandData.totalDuration.toFixed(1)}s</b>，
                     评级为 <b>{evalSitStandLevel(sitstandData.totalDuration).text}</b>。
                   </span>
                 </div>
