@@ -14,7 +14,7 @@ const C = {
 // ════════════════════════════════════════════════════════════════
 
 export const REPORT_BASIS_TEXT =
-  '依据说明：本系统采用"核心硬指标(72%) + 柔性触觉感知增强指标(28%)"的 V3 综合评分框架。核心硬指标依据《亚洲肌少症工作组（AWGS）2019 共识》及《社区老年人肌肉减少症筛查专家共识》：握力按性别阈值（男 28kg / 女 18kg）换算 R 值分层，3次起坐总时长分层（≤6s 为佳，档位由 5 次口径按比例换算），日常步速分层（≥1.0m/s 为佳），静态站立结合四阶段平衡、COP 稳态与左右负荷偏移。增强指标利用本设备高密度压力传感特性（手指分区贡献、抓握稳定性、起坐周期稳定性、足底分区、COP 轨迹形态、步态对称性等）作辅助功能解释。本评分用于社区老年活动能力筛查、风险分层和干预建议生成，不作为疾病诊断依据。';
+  '依据说明：本系统采用"核心硬指标(72%) + 柔性触觉感知增强指标(28%)"的 V3 综合评分框架，共 4 个模块（握力、起坐、静态站立、行走步态四项设备实测）。每模块单项报告满分 25 分（核心 18 + 增强 7），计入综合分时按 25 分权重折算，综合总分 100 分。核心硬指标依据《亚洲肌少症工作组（AWGS）2019 共识》及《社区老年人肌肉减少症筛查专家共识》：握力按性别阈值（男 28kg / 女 18kg）换算 R 值分层，3次起坐总时长分层（≤6s 为佳，档位由 5 次口径按比例换算），日常步速分层（≥1.0m/s 为佳），静态站立结合四阶段平衡、COP 稳态与左右负荷偏移。增强指标利用本设备高密度压力传感特性（手指分区贡献、抓握稳定性、起坐周期稳定性、足底分区、COP 轨迹形态、步态对称性等）作辅助功能解释。本评分用于社区老年活动能力筛查、风险分层和干预建议生成，不作为疾病诊断依据。';
 
 export const ASSESSMENT_LABELS = {
   grip: '握力',
@@ -23,7 +23,29 @@ export const ASSESSMENT_LABELS = {
   sitstand: '起坐',
 };
 
+/**
+ * 全系统唯一的模块清单（顺序 = 建议评估顺序）。
+ * 新增/调整模块只改这里 + scoreAssessment 的 switch。
+ */
+export const ASSESSMENT_KEYS = ['grip', 'sitstand', 'standing', 'gait'];
+
+/** 单模块内部满分（核心 18 + 增强 7），各模块报告与单项排名均用此口径 */
 export const ASSESSMENT_MAX_SCORE = 25;
+
+/**
+ * 综合评分中每个模块的权重分。
+ * 4 个模块 × 25 = 100 分，与单模块满分同为 25，因此折算系数为 1（toWeightedScore 恒等）。
+ * 保留这层折算不是冗余：模块数一旦再变（如二期加回问卷模块），只需改这里的权重分，
+ * 总分仍维持 100 分制，overallLevel 的 40/60/80 阈值不必跟着动。
+ */
+export const MODULE_WEIGHT_SCORE = 25;
+export const COMPREHENSIVE_MAX_SCORE = ASSESSMENT_KEYS.length * MODULE_WEIGHT_SCORE; // 100
+
+/** 把单模块 0–25 原始分折算为综合分里的 0–25 贡献（当前 4 模块口径下为恒等） */
+export function toWeightedScore(rawScore) {
+  const raw = toNumber(rawScore, 0) || 0;
+  return (raw / ASSESSMENT_MAX_SCORE) * MODULE_WEIGHT_SCORE;
+}
 
 export function toNumber(value, fallback = null) {
   if (value === null || value === undefined || value === '' || value === '--' || value === '—') {
@@ -1017,12 +1039,13 @@ function joinChinese(items) {
 }
 
 function buildComprehensiveSummary(totalScore, level, completedResults, redFlags = []) {
+  const moduleCount = ASSESSMENT_KEYS.length;
   if (!completedResults.length) {
-    return '尚未形成完整综合评分，请先完成四项评估。';
+    return `尚未形成完整综合评分，请先完成${moduleCount}项评估。`;
   }
 
-  const completedText = completedResults.length < 4
-    ? `当前已完成 ${completedResults.length}/4 项，`
+  const completedText = completedResults.length < moduleCount
+    ? `当前已完成 ${completedResults.length}/${moduleCount} 项，`
     : '';
   const sorted = [...completedResults].sort((a, b) => a.score - b.score);
   const lowItems = sorted.filter(item => item.score <= 15 || item.priorityRisk);
@@ -1036,7 +1059,7 @@ function buildComprehensiveSummary(totalScore, level, completedResults, redFlags
     const flagText = hasAnyFlag
       ? `同时看到局部提示：${redFlags.slice(0, 2).join('；')}。这些提示不等于综合功能差，更像是足部支撑、动作习惯或单项细节上的优化空间。`
       : '本次未见明显短板或红线提示。';
-    return `${completedText}本次综合得分为 ${totalScore}/100，综合等级为"${level.text}"。先给您一个肯定的结论：本次四项结果整体较好，${itemText}，说明上肢肌力、日常行走、站立控制和起坐转移能力基础较稳，当前日常活动能力储备较好。${flagText}${COMPREHENSIVE_LEVEL_GUIDANCE['表现较好']}若之后出现跌倒、明显乏力、体重下降、走路变慢、疼痛麻木或起身安全感下降，可提前带报告咨询社区卫生服务中心、全科或老年医学科。`;
+    return `${completedText}本次综合得分为 ${totalScore}/${COMPREHENSIVE_MAX_SCORE}，综合等级为"${level.text}"。先给您一个肯定的结论：本次各项结果整体较好，${itemText}，说明日常自理与居家安全、上肢肌力、日常行走、站立控制和起坐转移能力基础较稳，当前日常活动能力储备较好。${flagText}${COMPREHENSIVE_LEVEL_GUIDANCE['表现较好']}若之后出现跌倒、明显乏力、体重下降、走路变慢、疼痛麻木或起身安全感下降，可提前带报告咨询社区卫生服务中心、全科或老年医学科。`;
   }
 
   const focusItems = mainItems.length ? mainItems : relativeItems.slice(0, 2);
@@ -1055,24 +1078,28 @@ function buildComprehensiveSummary(totalScore, level, completedResults, redFlags
     ? '如果近3个月有跌倒、起身困难、走路明显变慢、疼痛麻木、体重下降或多项分数偏低，建议带本报告到社区卫生服务中心、全科/老年医学科先做综合评估；需要训练方案时可转康复医学科，合并关节疼痛或神经症状时再按医生建议转骨科或神经内科。'
     : '若训练后1-3个月复测没有改善，或日常走路、上下楼、起身时安全感下降，可带报告咨询社区医生、全科或康复医学科。';
 
-  return `${completedText}本次综合得分为 ${totalScore}/100，综合等级为"${level.text}"。四项得分为${itemText}，${focusText}。${reasonText}${impactText ? `${impactText}。` : '这些表现可能影响日常起身、步行、上下楼或防跌倒能力。'}建议优先围绕${actionText || '规律活动、力量训练和平衡训练'}制定训练和复测计划。${levelAdvice}${doctorText}`;
+  return `${completedText}本次综合得分为 ${totalScore}/${COMPREHENSIVE_MAX_SCORE}，综合等级为"${level.text}"。各项得分为${itemText}，${focusText}。${reasonText}${impactText ? `${impactText}。` : '这些表现可能影响日常起身、步行、上下楼或防跌倒能力。'}建议优先围绕${actionText || '规律活动、力量训练和平衡训练'}制定训练和复测计划。${levelAdvice}${doctorText}`;
 }
 
 export function buildComprehensiveScoreResult(assessments = {}, patientInfo = {}) {
-  const results = ['grip', 'gait', 'standing', 'sitstand'].map(type => {
+  const results = ASSESSMENT_KEYS.map(type => {
     const reportData = assessments[type]?.report?.reportData || assessments[type]?.reportData || null;
-    return assessments[type]?.completed && reportData
+    const result = assessments[type]?.completed && reportData
       ? scoreAssessment(type, reportData, patientInfo)
-      : makeResult({
-        type,
-        title: `${ASSESSMENT_LABELS[type]}评分`,
-        score: 0,
-        summary: `${ASSESSMENT_LABELS[type]}尚未完成。`,
-      });
+      : null;
+    const safe = result || makeResult({
+      type,
+      title: `${ASSESSMENT_LABELS[type]}评分`,
+      score: 0,
+      summary: `${ASSESSMENT_LABELS[type]}尚未完成。`,
+    });
+    // weightedScore：该模块计入综合分的贡献（0–20），单项 score 仍保持 0–25 原始口径
+    return { ...safe, weightedScore: toWeightedScore(safe.score), weightedMax: MODULE_WEIGHT_SCORE };
   });
 
   const completedResults = results.filter(item => item.score > 0);
-  const totalScore = results.reduce((sum, item) => sum + (item?.score || 0), 0);
+  // 综合分 = Σ(各模块 0–25 折算成 0–20)，5 模块满分 100 → overallLevel 的 40/60/80 阈值继续有效
+  const totalScore = Math.round(results.reduce((sum, item) => sum + (item?.weightedScore || 0), 0));
   const level = overallLevel(totalScore, completedResults);
   const sorted = [...completedResults].sort((a, b) => a.score - b.score);
   const mainShortfall = sorted[0];
@@ -1083,7 +1110,7 @@ export function buildComprehensiveScoreResult(assessments = {}, patientInfo = {}
     type: 'comprehensive',
     title: '综合评分',
     score: totalScore,
-    maxScore: 100,
+    maxScore: COMPREHENSIVE_MAX_SCORE,
     level: level.text,
     color: level.color,
     bg: level.bg,
@@ -1094,9 +1121,10 @@ export function buildComprehensiveScoreResult(assessments = {}, patientInfo = {}
     completedCount: completedResults.length,
     mainShortfall: mainShortfall?.type || null,
     levelDesc: level.desc,
+    // 综合报告按权重分展示（每模块 20 分），原始 25 分制成绩见各单项报告
     indicators: results.map(item => ({
       label: ASSESSMENT_LABELS[item.type],
-      value: `${item.score}/25`,
+      value: `${Math.round(item.weightedScore)}/${MODULE_WEIGHT_SCORE}`,
     })),
   };
 }

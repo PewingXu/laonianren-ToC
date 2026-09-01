@@ -1,0 +1,32 @@
+/*
+ * 作用域说明：原交付包这里是 :root（全局）。嵌入本系统后会与 index.css 的 :root
+ * 撞名并覆盖 --radius-sm/--radius-md/--shadow-sm/--shadow-md，导致现有 ZEISS 组件
+ * 的圆角和阴影被静默改掉。CSS 自定义属性会向下继承，因此收敛到 5 个报告根元素即可，
+ * 报告内部照常取到这些变量，外部页面不受影响。
+ */
+.health-overview,
+.grip-report,
+.sit-stand-report,
+.standing-report,
+.gait-report {
+  --color-ink: #172033;
+  --color-muted: #62708a;
+  --color-surface: #ffffff;
+  --color-canvas: #f3f6fa;
+  --color-primary: #1677ff;
+  --color-success: #16a085;
+  --color-warning: #d9822b;
+  --color-danger: #d64545;
+  --content-width: 1200px;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --shadow-sm: 0 1px 2px rgb(23 32 51 / 8%);
+  --shadow-md: 0 8px 24px rgb(23 32 51 / 12%);
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}

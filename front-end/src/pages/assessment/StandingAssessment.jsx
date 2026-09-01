@@ -1,7 +1,12 @@
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAssessment } from '../../contexts/AssessmentContext';
-import StandingReport from '../../components/report/StandingReport';
+// ── 0810 报告交付包页面，取代原 StandingReport ──
+import { StandingReportPage } from '../../reports-v2/features/standing-report/pages/StandingReportPage';
+import { createInMemoryReportGateway } from '../../lib/localReportGateway';
+import { shareReportSummary } from '../../lib/reportBoundaries';
+// PDF 导出走 Chromium 原生打印（矢量、可搜索），不走 html2canvas
+import { ReportPdfButton, buildReportFileName } from '../../lib/reportPdf';
 import EChart from '../../components/ui/EChart';
 import StandingCanvas from '../../components/three/standing/StandingCanvas';
 import ParticleControlPanel from '../../components/three/shared/ParticleControlPanel';
@@ -340,8 +345,11 @@ function LeftDataPanel({ leftPressure, rightPressure, realtimeData, copTrajector
 /* ─── 主组件 ─── */
 export default function StandingAssessment() {
   const navigate = useNavigate();
+  // 「测完即看」的报告滚动容器。PDF 导出的打印范围就是它 —— reportPdf.jsx 会在这个
+  // 节点上打 data-print-root，print.css 据此把外壳 header/footer 排除出纸面。
+  const reportScrollRef = useRef(null);
   const location = useLocation();
-  const { patientInfo, institution, completeAssessment, updateAssessmentAiReport, deviceConnStatus, assessments } = useAssessment();
+  const { patientInfo, institution, completeAssessment, deviceConnStatus, assessments } = useAssessment();
   // 从 Dashboard "查看报告" 跳转过来时，直接显示报告
   const viewReportMode = location.state?.viewReport && assessments.standing?.completed;
   const isGlobalConnected = deviceConnStatus === 'connected';
@@ -904,9 +912,20 @@ export default function StandingAssessment() {
   };
   const handleClose = () => navigate('/dashboard');
   const fmtTime = (t) => { const s = Math.floor(t / 10); return `${String(Math.floor(s / 3600)).padStart(2, '0')}:${String(Math.floor((s % 3600) / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`; };
-  const handleStandingAiReportReady = useCallback((aiData) => {
-    updateAssessmentAiReport('standing', aiData, assessmentIdRef.current);
-  }, [updateAssessmentAiReport]);
+  /*
+   * 交付包报告页的数据源：刚测完还没落库，用内存态 gateway 直接喂 state 里的 reportData。
+   * 必须 useMemo，否则会在交付包 hook 的依赖数组里造成无限取数。
+   *
+   * 原 handleStandingAiReportReady（AI 文案回写）已移除：交付包页面没有 onAiReportReady 入口，
+   * 一期 AI 区块走其自带的保守降级文案，回写通道二期恢复。
+   */
+  const standingReportGateway = useMemo(() => createInMemoryReportGateway({
+    type: 'standing',
+    reportData,
+    patient: patientInfo,
+    institution,
+    assessmentId: assessmentIdRef.current,
+  }), [reportData, patientInfo, institution]);
 
   // 组件卸载时清理定时器
   useEffect(() => {
@@ -938,15 +957,17 @@ export default function StandingAssessment() {
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
               {csvExporting ? '导出中...' : '保存CSV'}
             </button>
+            <ReportPdfButton
+              targetRef={reportScrollRef}
+              fileName={buildReportFileName(patientInfo?.name, '静态站立评估')}
+              title={`${patientInfo?.name || '未知'} 的静态站立评估报告`}
+            />
             <button onClick={handleClose} className="zeiss-btn-primary text-xs py-2 px-3 md:px-4">返回首页</button>
           </div>
         </header>
-        <main className="flex-1 min-h-0 overflow-auto">
-          <StandingReport
-              reportData={reportData}
-              patientInfo={patientInfo}
-              onAiReportReady={handleStandingAiReportReady}
-            />
+        <main ref={reportScrollRef} className="flex-1 min-h-0 overflow-auto">
+          {/* 不传 recordId：记录还没落库，身份由内存态 gateway 自己给 */}
+          <StandingReportPage gateway={standingReportGateway} onShare={shareReportSummary} />
         </main>
       </div>
     );

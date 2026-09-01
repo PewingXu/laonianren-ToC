@@ -2,7 +2,12 @@ import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAssessment } from '../../contexts/AssessmentContext';
 import HandModel from '../../components/three/HandModel';
-import GripReport from '../../components/report/GripReport';
+// ── 0810 报告交付包页面，取代原 GripReport ──
+import { GripReportPage } from '../../reports-v2/features/grip-report/pages/GripReportPage';
+import { createInMemoryReportGateway } from '../../lib/localReportGateway';
+import { shareReportSummary } from '../../lib/reportBoundaries';
+// PDF 导出走 Chromium 原生打印（矢量、可搜索），不走 html2canvas
+import { ReportPdfButton, buildReportFileName } from '../../lib/reportPdf';
 import EChart from '../../components/ui/EChart';
 import { HeatmapCanvas } from '../../lib/heatmap';
 import { mapLeftHand, mapRightHand, generateSimulatedSensorData } from '../../lib/gripDataMapping';
@@ -138,8 +143,11 @@ function LeftDataPanel({ leftData, rightData, leftStats, rightStats, phase, time
 /* ─── 主组件 ─── */
 export default function GripAssessment() {
   const navigate = useNavigate();
+  // 「测完即看」的报告滚动容器。PDF 导出的打印范围就是它 —— reportPdf.jsx 会在这个
+  // 节点上打 data-print-root，print.css 据此把外壳 header/footer 排除出纸面。
+  const reportScrollRef = useRef(null);
   const location = useLocation();
-  const { patientInfo, institution, completeAssessment, updateAssessmentAiReport, deviceConnStatus, backendBridge: globalBridge, assessments } = useAssessment();
+  const { patientInfo, institution, completeAssessment, deviceConnStatus, backendBridge: globalBridge, assessments } = useAssessment();
   // 从 Dashboard "查看报告" 跳转过来时，直接显示报告
   const viewReportMode = location.state?.viewReport && assessments.grip?.completed;
   // 如果首页已一键连接，自动进入后端模式
@@ -826,14 +834,26 @@ export default function GripAssessment() {
     setCsvExporting(false);
   };
 
-  const handleGripAiReportReady = useCallback((aiData) => {
-    const baseReportData = gripReportData || assessments.grip?.report?.reportData || {};
-    const nextReportData = { ...baseReportData, aiReport: aiData };
-    if (isPageMountedRef.current) {
-      setGripReportData(nextReportData);
-    }
-    updateAssessmentAiReport('grip', aiData, [leftAssessmentIdRef.current, rightAssessmentIdRef.current].filter(Boolean).join(','));
-  }, [assessments.grip?.report?.reportData, gripReportData, updateAssessmentAiReport]);
+  /*
+   * 交付包报告页的数据源。
+   * 这里刚测完，reportData 还在 React state 里（completeAssessment 是异步写 IndexedDB），
+   * 所以用内存态 gateway 直接喂手上的数据。
+   * 必须 useMemo：gateway 在交付包 hook 的 useEffect 依赖数组里，每次渲染新建会无限取数。
+   */
+  const gripReportGateway = useMemo(() => createInMemoryReportGateway({
+    type: 'grip',
+    reportData: gripReportData,
+    patient: patientInfo,
+    institution,
+    assessmentId: [leftAssessmentIdRef.current, rightAssessmentIdRef.current].filter(Boolean).join(','),
+  }), [gripReportData, patientInfo, institution]);
+
+  /*
+   * 原 handleGripAiReportReady（AI 文案生成完成后回写 reportData.aiReport）已移除：
+   * 交付包报告页没有 onAiReportReady 入口，它只读数据里预先烘好的 evaluation.aiSummary。
+   * 一期先保证真实测量数据跑通，AI 区块走交付包自带的保守降级文案；
+   * 把缓存的 aiReport 映射成 evaluation.aiSummary 放二期，届时在此恢复回写通道。
+   */
 
   /* ─── 报告模式 ─── */
   if (phase === 'report') {
@@ -862,12 +882,18 @@ export default function GripAssessment() {
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
               {csvExporting ? '导出中...' : '保存CSV'}
             </button>
+            <ReportPdfButton
+              targetRef={reportScrollRef}
+              fileName={buildReportFileName(patientInfo?.name, '握力评估')}
+              title={`${patientInfo?.name || '未知'} 的握力评估报告`}
+            />
             <button onClick={handleClose} className="zeiss-btn-primary text-xs py-2 px-4">返回首页</button>
           </div>
         </header>
-        <main className="flex-1 min-h-0 z-10">
-          <GripReport patientName={patientInfo?.name || '未知'} patientInfo={patientInfo} onClose={handleClose} reportData={gripReportData}
-            onAiReportReady={handleGripAiReportReady} />
+        {/* index.css 禁掉了 body 滚动，交付包报告页本身没有内滚动容器，滚动条必须挂在这里 */}
+        <main ref={reportScrollRef} className="flex-1 min-h-0 z-10 overflow-auto">
+          {/* 不传 recordId：记录还没落库，身份由内存态 gateway 自己给 */}
+          <GripReportPage gateway={gripReportGateway} onShare={shareReportSummary} />
         </main>
       </div>
     );

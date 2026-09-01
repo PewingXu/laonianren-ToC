@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node --check server/serialServer.js)",
+      "Bash(ls /Users/ycu5pd 2>/dev/null; ls / 2>/dev/null | head -30)",
+      "Read(//c//**)",
+      "Bash(node -e ' *)",
+      "Bash(ls -d /c/Users/xpr12/Desktop/laonianren-express /mnt/c/Users/xpr12/Desktop/laonianren-express \"c:/Users/xpr12/Desktop/laonianren-express\" 2>&1 | head)",
+      "Read(//mnt/c/Users/xpr12/Desktop/**)",
+      "Bash(node \"c:/tmp/perf.mjs\")"
+    ]
+  }
+}

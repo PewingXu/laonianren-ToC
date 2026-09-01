@@ -12,6 +12,7 @@ import AssessmentHistory from './pages/AssessmentHistory';
 import HistoryReportView from './pages/HistoryReportView';
 import HistoryComprehensiveView from './pages/HistoryComprehensiveView';
 import NotFound from './pages/NotFound';
+import ReportDebug from './pages/ReportDebug';
 import UpdateNotification from './components/ui/UpdateNotification';
 
 // Assessment Pages
@@ -37,6 +38,8 @@ function App() {
             <Route path="/history" element={<AssessmentHistory />} />
             <Route path="/history/report" element={<HistoryReportView />} />
             <Route path="/history/comprehensive" element={<HistoryComprehensiveView />} />
+            {/* 报告调试台：上传 CSV/Excel/JSON 直接出报告，不接设备、不写库 */}
+            <Route path="/debug/report" element={<ReportDebug />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </ToastProvider>

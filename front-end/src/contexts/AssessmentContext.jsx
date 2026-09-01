@@ -33,7 +33,7 @@ const INITIAL_STATE = {
   // 当前评估会话 ID（区分同名患者的不同评估）
   sessionId: generateSessionId(),
   
-  // 四个评估的完成状态和数据
+  // 四项设备实测评估的完成状态和数据
   assessments: {
     grip: { completed: false, report: null, data: null },
     sitstand: { completed: false, report: null, data: null },
@@ -233,11 +233,17 @@ export function AssessmentProvider({ children }) {
             // 不发送 data 字段（原始传感器数据）
           };
         }
-        try {
-          saveAssessmentSession(prev.patientInfo, prev.institution, assessmentsForSave, prev.sessionId);
-        } catch (e) {
-          console.error('自动保存历史记录失败:', e);
-        }
+        // 持久化是异步副作用，必须移出 setState updater：
+        // ① updater 内同步写盘会阻塞本次渲染提交（报告较大时明显卡顿）；
+        // ② React StrictMode 下 updater 会被调用两次，导致重复写入。
+        const { patientInfo: pi, institution: inst, sessionId: sid } = prev;
+        Promise.resolve().then(() => {
+          try {
+            return saveAssessmentSession(pi, inst, assessmentsForSave, sid);
+          } catch (e) {
+            console.error('自动保存历史记录失败:', e);
+          }
+        }).catch(e => console.error('自动保存历史记录失败:', e));
       }
 
       return { ...prev, assessments };
@@ -285,11 +291,17 @@ export function AssessmentProvider({ children }) {
             assessmentId: val.assessmentId || null,
           };
         }
-        try {
-          saveAssessmentSession(prev.patientInfo, prev.institution, assessmentsForSave, prev.sessionId);
-        } catch (e) {
-          console.error('自动保存历史记录失败:', e);
-        }
+        // 持久化是异步副作用，必须移出 setState updater：
+        // ① updater 内同步写盘会阻塞本次渲染提交（报告较大时明显卡顿）；
+        // ② React StrictMode 下 updater 会被调用两次，导致重复写入。
+        const { patientInfo: pi, institution: inst, sessionId: sid } = prev;
+        Promise.resolve().then(() => {
+          try {
+            return saveAssessmentSession(pi, inst, assessmentsForSave, sid);
+          } catch (e) {
+            console.error('自动保存历史记录失败:', e);
+          }
+        }).catch(e => console.error('自动保存历史记录失败:', e));
       }
 
       return { ...prev, assessments };

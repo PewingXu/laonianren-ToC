@@ -3097,8 +3097,18 @@ function ensureHistoryTable(db) {
       created_at TEXT DEFAULT (datetime('now'))
     )
   `, (err) => {
-    if (err) console.error('[History] 创建 assessment_history 表失败:', err)
-    else console.log('[History] assessment_history 表已就绪')
+    if (err) {
+      console.error('[History] 创建 assessment_history 表失败:', err)
+      return
+    }
+    console.log('[History] assessment_history 表已就绪')
+    // 列表接口按 updated_at 倒序分页、按 date_str 过滤，加索引避免记录变多后排序变慢
+    db.run('CREATE INDEX IF NOT EXISTS idx_history_updated_at ON assessment_history(updated_at DESC)', (e) => {
+      if (e) console.error('[History] 创建 idx_history_updated_at 失败:', e.message)
+    })
+    db.run('CREATE INDEX IF NOT EXISTS idx_history_date_str ON assessment_history(date_str)', (e) => {
+      if (e) console.error('[History] 创建 idx_history_date_str 失败:', e.message)
+    })
   })
 }
 
@@ -4399,6 +4409,28 @@ function ensureMatrixNameColumn(db) {
           if (e) console.error('ALTER TABLE add select failed:', e)
         })
       }
+
+      // ⚠️ 性能关键：matrix 会随采集次数增长到几十万行（每行是一帧原始压力数据）。
+      // 生成报告 / 导出 CSV 都要 WHERE assessment_id=? [AND sample_type=?] 取出这次采集的帧；
+      // 没有索引时 SQLite 只能全表扫描（68 万行 ≈ 4GB 全读一遍，实测 10.8 秒），
+      // 而这 10 秒会占住数据库连接，让采集的 INSERT 排队 → 实时采集画面同步卡住。
+      // 建好索引后同样的查询走 SEARCH USING INDEX，实测 1ms。
+      // CREATE INDEX IF NOT EXISTS 是幂等的：新库天生有索引，老库首次启动自动补建（几十万行约几十秒，仅一次）。
+      const indexStatements = [
+        ['idx_matrix_assessment_sample', 'CREATE INDEX IF NOT EXISTS idx_matrix_assessment_sample ON matrix(assessment_id, sample_type)'],
+        ['idx_matrix_timestamp', 'CREATE INDEX IF NOT EXISTS idx_matrix_timestamp ON matrix(timestamp)'],
+        ['idx_matrix_date', 'CREATE INDEX IF NOT EXISTS idx_matrix_date ON matrix(date)'],
+      ]
+      indexStatements.forEach(([name, sql]) => {
+        const t0 = Date.now()
+        db.run(sql, (e) => {
+          if (e) console.error(`[db] 创建索引 ${name} 失败:`, e.message)
+          else {
+            const cost = Date.now() - t0
+            if (cost > 500) console.log(`[db] 索引 ${name} 已补建（耗时 ${cost}ms，仅首次）`)
+          }
+        })
+      })
     })
   })
 }

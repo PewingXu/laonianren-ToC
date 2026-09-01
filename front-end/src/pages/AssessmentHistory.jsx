@@ -1,12 +1,30 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAssessment } from '../contexts/AssessmentContext';
-import { searchHistory, deleteRecord, clearHistory, saveAssessmentSession } from '../lib/historyService';
+import { searchHistory, deleteRecord, clearHistory, saveAssessmentSession, getRecord } from '../lib/historyService';
 import { backendBridge } from '../lib/BackendBridge';
 import { prepareImport, extractCsvSheetsFromXlsx, TYPE_LABEL } from '../lib/csvImport';
 import { REGION_LABEL } from '../lib/deviceRegion';
-import { addScore, getRankIncludingSelf, getCount, clearDistribution } from '../lib/scoreRanking';
-import { buildComprehensiveScoreResult } from '../lib/assessmentScoring';
+import {
+  getRankIncludingSelf,
+  getCount,
+  loadDistribution,
+  loadScoreIndex,
+  setRecordScoresBatch,
+  removeRecordScores,
+  rebuildDistributionFromIndex,
+  computeRankFromDist,
+  clearDistribution,
+} from '../lib/scoreRanking';
+import {
+  buildComprehensiveScoreResult,
+  ASSESSMENT_KEYS,
+  ASSESSMENT_LABELS as SHORT_LABELS,
+} from '../lib/assessmentScoring';
+
+const MODULE_COUNT = ASSESSMENT_KEYS.length;
+// 表格栅格：序号1 + 患者2 + 日期1 + 各评估各1 + 完成度2 + 操作2
+const GRID_TEMPLATE = `repeat(${6 + MODULE_COUNT + 2}, minmax(0, 1fr))`;
 
 const ASSESSMENT_LABELS = {
   grip: '握力评估',
@@ -41,8 +59,6 @@ const ASSESSMENT_ICONS = {
   ),
 };
 
-const ASSESSMENT_KEYS = ['grip', 'sitstand', 'standing', 'gait'];
-
 export default function AssessmentHistory() {
   const navigate = useNavigate();
   const { institution, patientInfo } = useAssessment();
@@ -69,15 +85,23 @@ export default function AssessmentHistory() {
   const [busyMsg, setBusyMsg] = useState('');
   const [rankMap, setRankMap] = useState({});    // recordId -> { [type]: {percent, total, ...} }
 
+  // 搜索防抖：每敲一个字都要全量读取+过滤历史，记录多时逐键卡顿；停止输入 280ms 后再查
+  const [debouncedTerm, setDebouncedTerm] = useState('');
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedTerm(searchTerm), 280);
+    return () => clearTimeout(t);
+  }, [searchTerm]);
+
   // 异步加载数据
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
     searchHistory({
-      keyword: searchTerm,
+      keyword: debouncedTerm,
       date: dateFilter,
       page: currentPage,
       pageSize,
+      light: true, // 列表只要摘要字段，不加载含 base64 图片的报告数据
     }).then(result => {
       if (!cancelled) {
         setItems(result.items || []);
@@ -94,19 +118,24 @@ export default function AssessmentHistory() {
       }
     });
     return () => { cancelled = true; };
-  }, [searchTerm, dateFilter, currentPage, refreshKey]);
+  }, [debouncedTerm, dateFilter, currentPage, refreshKey]);
 
-  useEffect(() => { setCurrentPage(1); }, [searchTerm, dateFilter]);
+  useEffect(() => { setCurrentPage(1); }, [debouncedTerm, dateFilter]);
 
   const handleDelete = useCallback(async (id) => {
     await deleteRecord(id);
+    // 同步移出得分索引并重建频次表，否则被删的人还留在排名基数里
+    removeRecordScores(id);
+    rebuildDistributionFromIndex();
     setShowDeleteConfirm(null);
     setRefreshKey(k => k + 1);
   }, []);
 
   const handleClear = useCallback(async () => {
     await clearHistory();
+    clearDistribution(); // 记录清空了，排名两张表也一起清
     setShowClearConfirm(false);
+    setRankMap({});
     setRefreshKey(k => k + 1);
   }, []);
 
@@ -127,50 +156,88 @@ export default function AssessmentHistory() {
     fr.readAsText(file);
   });
 
+  /** 取一条记录里各模块的有效得分（无效/未完成项不计入排名） */
+  const extractItemScores = (rec) => {
+    const patient = { name: rec.patientName, gender: rec.patientGender || '男', age: rec.patientAge, weight: rec.patientWeight };
+    const comp = buildComprehensiveScoreResult(rec.assessments || {}, patient);
+    const itemScores = {};
+    (comp.itemResults || []).forEach(it => {
+      if (rec.assessments?.[it.type]?.completed && !it.invalid && it.score > 0) {
+        itemScores[it.type] = it.score;
+      }
+    });
+    // 不做综合总分排名：历史数据集里各人完成项目数不一，凑不齐 4 项无法公平比总分，只保留单项排名
+    return itemScores;
+  };
+
   /**
-   * 全量重算：按当前【全部】历史记录重建频次表（幂等，重复导入不会重复计分），
-   * 并计算每条记录各项/综合的"超越百分比"（同分排前、分母含本人）。
+   * 全量重建：读全部记录算分 → 写「得分索引」→ 由索引聚合出「频次表」（各一次落盘）。
+   * 只在【导入完成】或【手动点重算排名】时执行；日常进页面不跑这个。
    */
   const recalcAllScores = useCallback(async () => {
     const all = await searchHistory({ keyword: '', date: '', page: 1, pageSize: 100000 });
     const records = all.items || [];
-    clearDistribution();
     const perRecord = [];
+    const indexEntries = {};
     for (const rec of records) {
-      const patient = { name: rec.patientName, gender: rec.patientGender || '男', age: rec.patientAge, weight: rec.patientWeight };
-      const comp = buildComprehensiveScoreResult(rec.assessments || {}, patient);
-      const itemScores = {};
-      (comp.itemResults || []).forEach(it => {
-        if (rec.assessments?.[it.type]?.completed && !it.invalid && it.score > 0) {
-          itemScores[it.type] = it.score;
-          addScore(it.type, it.score);
-        }
-      });
-      const completeAll = ASSESSMENT_KEYS.every(t => rec.assessments?.[t]?.completed);
-      if (completeAll) {
-        itemScores.comprehensive = comp.score;
-        addScore('comprehensive', comp.score);
-      }
+      const itemScores = extractItemScores(rec);
+      indexEntries[rec.id] = itemScores;
       perRecord.push({ id: rec.id, sessionId: rec.sessionId, name: rec.patientName, itemScores });
     }
-    // 频次表建完后再算每人的排名（相对其他所有人）
+    setRecordScoresBatch(indexEntries, true);          // ① 整表替换得分索引（一次落盘）
+    const dist = rebuildDistributionFromIndex();        // ② 由索引聚合频次表（一次落盘）
+
     const nextRank = {};
     for (const r of perRecord) {
       const ranks = {};
       for (const type in r.itemScores) {
-        ranks[type] = { score: r.itemScores[type], ...getRankIncludingSelf(type, r.itemScores[type]) };
+        ranks[type] = { score: r.itemScores[type], ...computeRankFromDist(dist, type, r.itemScores[type]) };
       }
       nextRank[r.id] = ranks;
     }
     setRankMap(nextRank);
-    return { records, perRecord, nextRank };
+    return { records, perRecord, nextRank, dist };
   }, []);
 
-  // 进入历史页 / 数据变动后自动重算排名徽章（rankMap 是内存态，刷新后会丢失；
-  // 全量重算毫秒级且幂等，同时保证删除记录后频次表同步更新）
+  /**
+   * 进入历史页 / 翻页 / 搜索后，只为【当前页这 10 条】显示徽章：
+   *   优先直接查「得分索引」（纯内存查表，不碰报告数据）；
+   *   索引里没有的（老记录/刚导入未入索引）才按 id 读一次完整记录算分，并回填索引，下次即命中。
+   * 这样常态下进页面 = 两次查表，与总记录数、报告体积都无关。
+   */
   useEffect(() => {
-    recalcAllScores().catch(err => console.error('自动重算排名失败:', err));
-  }, [recalcAllScores, refreshKey]);
+    if (!items.length) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const dist = loadDistribution();
+        const index = loadScoreIndex();
+        const next = {};
+        const backfill = {};
+        for (const it of items) {
+          if (cancelled) return;
+          let itemScores = index[String(it.id)];
+          if (!itemScores) {
+            const full = await getRecord(it.id);   // 索引未命中才读报告
+            if (!full) continue;
+            itemScores = extractItemScores(full);
+            backfill[it.id] = itemScores;
+          }
+          const ranks = {};
+          for (const type in itemScores) {
+            ranks[type] = { score: itemScores[type], ...computeRankFromDist(dist, type, itemScores[type]) };
+          }
+          next[it.id] = ranks;
+        }
+        if (cancelled) return;
+        if (Object.keys(backfill).length) setRecordScoresBatch(backfill); // 回填，一次落盘
+        setRankMap(prev => ({ ...prev, ...next }));
+      } catch (err) {
+        console.error('计算当前页排名失败:', err);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [items]);
 
   const handleFilesSelected = useCallback(async (e) => {
     const files = Array.from(e.target.files || []);
@@ -276,17 +343,15 @@ export default function AssessmentHistory() {
             if (!rec) continue;
             const parts = Object.entries(rec.itemScores).map(([type, score]) => {
               const rk = getRankIncludingSelf(type, score);
-              const label = type === 'comprehensive' ? '综合' : TYPE_LABEL[type];
-              const max = type === 'comprehensive' ? 100 : 25;
-              return `${label} ${score}/${max}·超越${rk.percent.toFixed(1)}%`;
+              return `${SHORT_LABELS[type] || type} ${score}/25·超越${rk.percent.toFixed(1)}%`;
             });
             lines.push(`${key}：${parts.join('；') || '无有效得分'}`);
           }
           summary = `\n\n── 测评结果 ──\n${lines.join('\n')}`;
         } else {
           // 基础库模式：报告基础库规模
-          const counts = ASSESSMENT_KEYS.map(t => `${TYPE_LABEL[t]}${getCount(t)}人`).join('、');
-          summary = `\n\n基础库现有：${counts}、综合${getCount('comprehensive')}人`;
+          const counts = ASSESSMENT_KEYS.map(t => `${SHORT_LABELS[t]}${getCount(t)}人`).join('、');
+          summary = `\n\n基础库现有：${counts}（仅单项排名，不做综合总分排名）`;
         }
       } catch (err) {
         summary = `\n\n评分排名计算失败：${err.message}`;
@@ -374,6 +439,12 @@ export default function AssessmentHistory() {
                 style={{ color: 'white', background: 'linear-gradient(135deg, #0066CC, #0891B2)', border: 'none', cursor: busy ? 'not-allowed' : 'pointer', opacity: busy ? 0.6 : 1 }}>
                 导入测评
               </button>
+              <button onClick={() => navigate('/debug/report')}
+                title="上传 CSV / Excel / JSON 直接出报告，不接设备、不写入历史记录（调试用）"
+                className="text-xs px-3 py-2 rounded-lg font-semibold transition-colors"
+                style={{ color: '#B45309', background: '#FEF3C7', border: '1px solid #B4530933' }}>
+                报告调试台
+              </button>
               <button onClick={handleRecalcRank} disabled={busy}
                 title="按当前全部历史记录重建评分基础库并重算所有排名（幂等，可反复点）"
                 className="text-xs px-3 py-2 rounded-lg font-semibold transition-colors"
@@ -397,15 +468,16 @@ export default function AssessmentHistory() {
             </div>
           </div>
 
-          {/* Table Header */}
-          <div className="grid grid-cols-12 gap-2 px-4 sm:px-6 py-3 text-xs font-semibold zeiss-table-header">
+          {/* Table Header：栅格 = 序号1 + 患者2 + 日期1 + 评估N + 完成度2 + 操作2（Tailwind 无 grid-cols-13，用 inline style） */}
+          <div className="grid gap-2 px-4 sm:px-6 py-3 text-xs font-semibold zeiss-table-header" style={{ gridTemplateColumns: GRID_TEMPLATE }}>
             <div className="col-span-1 text-center" style={{ color: 'var(--text-tertiary)' }}>序号</div>
             <div className="col-span-2" style={{ color: 'var(--text-tertiary)' }}>患者信息</div>
             <div className="col-span-1 text-center" style={{ color: 'var(--text-tertiary)' }}>日期</div>
-            <div className="col-span-1 text-center" style={{ color: 'var(--text-tertiary)' }}>握力</div>
-            <div className="col-span-1 text-center" style={{ color: 'var(--text-tertiary)' }}>起坐</div>
-            <div className="col-span-1 text-center" style={{ color: 'var(--text-tertiary)' }}>站立</div>
-            <div className="col-span-1 text-center" style={{ color: 'var(--text-tertiary)' }}>步态</div>
+            {ASSESSMENT_KEYS.map(key => (
+              <div key={key} className="col-span-1 text-center" style={{ color: 'var(--text-tertiary)' }}>
+                {SHORT_LABELS[key]}
+              </div>
+            ))}
             <div className="col-span-2 text-center" style={{ color: 'var(--text-tertiary)' }}>完成度</div>
             <div className="col-span-2 text-center" style={{ color: 'var(--text-tertiary)' }}>操作</div>
           </div>
@@ -435,7 +507,8 @@ export default function AssessmentHistory() {
 
                 return (
                   <React.Fragment key={item.id}>
-                    <div className="grid grid-cols-12 gap-2 px-4 sm:px-6 py-3.5 text-sm items-center zeiss-table-row cursor-pointer"
+                    <div className="grid gap-2 px-4 sm:px-6 py-3.5 text-sm items-center zeiss-table-row cursor-pointer"
+                      style={{ gridTemplateColumns: GRID_TEMPLATE }}
                       onClick={() => setExpandedRow(isExpanded ? null : item.id)}>
                       <div className="col-span-1 text-center" style={{ color: 'var(--text-muted)' }}>{globalIdx}</div>
                       <div className="col-span-2 min-w-0">
@@ -463,15 +536,15 @@ export default function AssessmentHistory() {
                         </div>
                       ))}
                       <div className="col-span-2 flex items-center justify-center gap-2">
-                        <div className="w-20 h-2 rounded-full overflow-hidden" style={{ background: 'var(--border-light)' }}>
+                        <div className="w-16 h-2 rounded-full overflow-hidden" style={{ background: 'var(--border-light)' }}>
                           <div className="h-full rounded-full transition-all"
                             style={{
-                              width: `${(completedCount / 4) * 100}%`,
-                              background: completedCount === 4 ? 'var(--success)' : 'var(--zeiss-blue)'
+                              width: `${(completedCount / MODULE_COUNT) * 100}%`,
+                              background: completedCount === MODULE_COUNT ? 'var(--success)' : 'var(--zeiss-blue)'
                             }} />
                         </div>
-                        <span className="text-xs font-medium" style={{ color: completedCount === 4 ? 'var(--success)' : 'var(--zeiss-blue)' }}>
-                          {completedCount}/4
+                        <span className="text-xs font-medium" style={{ color: completedCount === MODULE_COUNT ? 'var(--success)' : 'var(--zeiss-blue)' }}>
+                          {completedCount}/{MODULE_COUNT}
                         </span>
                       </div>
                       <div className="col-span-2 flex justify-center gap-2">
@@ -491,7 +564,7 @@ export default function AssessmentHistory() {
                     {/* 展开详情 - 每个评估都可以点击查看报告 */}
                     {isExpanded && (
                       <div className="px-4 sm:px-6 pb-4 animate-slideUp" style={{ background: 'var(--bg-tertiary)' }}>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-3">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3 pt-3">
                           {ASSESSMENT_KEYS.map(key => {
                             const assessment = item.assessments?.[key];
                             const completed = assessment?.completed;
@@ -556,13 +629,7 @@ export default function AssessmentHistory() {
                         {/* 一键操作区 */}
                         {getCompletedCount(item.assessments) > 0 && (
                           <div className="mt-3 flex items-center gap-3 flex-wrap">
-                            {/* 综合排名徽章（一键生成后、且四项齐全时显示） */}
-                            {rankMap[item.id]?.comprehensive && (
-                              <span className="text-xs px-3 py-2 rounded-lg font-semibold"
-                                style={{ background: '#EFF6FF', color: '#0066CC', border: '1px solid #0066CC22' }}>
-                                综合 {rankMap[item.id].comprehensive.score}/100 · 超越 {rankMap[item.id].comprehensive.percent.toFixed(1)}%
-                              </span>
-                            )}
+                            {/* 综合总分不参与排名（各人完成项目数不一），故此处不显示综合超越百分比 */}
                             {/* 综合报告按钮 */}
                             <button
                               onClick={(e) => {

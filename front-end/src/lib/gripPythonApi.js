@@ -7,7 +7,11 @@
 import { sanitizeAiReport } from './aiTextSanitizer';
 import { AI_ENABLED } from './featureFlags';
 
-const DIRECT_PYTHON_API_BASE = 'http://127.0.0.1:8765';
+// 端口避开 Windows winnat 的抢占区（详见 back-end/code/index.js 顶部说明）：
+// 原来的 8765 落在实测到的 8712-8811 预留段里，Python 服务会间歇性 bind 失败。
+// Electron 启动时把实际端口写进 VITE_PYTHON_API_PORT，vite 再暴露给浏览器代码。
+const PYTHON_API_PORT = import.meta.env?.VITE_PYTHON_API_PORT || '18765';
+const DIRECT_PYTHON_API_BASE = `http://127.0.0.1:${PYTHON_API_PORT}`;
 const PYTHON_API_BASE_CANDIDATES = [
   '/pyapi',
   DIRECT_PYTHON_API_BASE,
@@ -58,7 +62,7 @@ async function fetchPythonApi(path, buildInit, options = {}) {
           return res;
         }
 
-        // Retry when the Vite proxy returns 5xx because 8765 is unreachable.
+        // Retry when the Vite proxy returns 5xx because the Python port is unreachable.
         if (base === '/pyapi' && res.status >= 500) {
           lastResponse = res;
           sawRetryableFailure = true;
@@ -109,7 +113,7 @@ async function parseErrorResponse(res) {
   ) {
     const isRunning = await isPythonAiServiceRunning();
     if (!isRunning) {
-      return 'Python AI service is not running on 127.0.0.1:8765';
+      return `Python AI service is not running on 127.0.0.1:${PYTHON_API_PORT}`;
     }
     return detail && detail !== `HTTP ${res.status}`
       ? detail
@@ -163,7 +167,7 @@ async function postAiReport(path, body) {
       const isRunning = await isPythonAiServiceRunning();
       return {
         success: false,
-        error: isRunning ? err.message : 'Python AI service is not running on 127.0.0.1:8765',
+        error: isRunning ? err.message : `Python AI service is not running on 127.0.0.1:${PYTHON_API_PORT}`,
       };
     } finally {
       inFlightAiRequests.delete(requestKey);

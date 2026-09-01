@@ -511,6 +511,10 @@ async def _generate_assessment_ai_report(
 ):
     from llm_service import call_assessment_ai_report
 
+    name = (patient_info or {}).get("name", "未知")
+    print(f"\n[API] ↘ 收到 AI 报告请求: type={assessment_type} 姓名={name} "
+          f"前端是否传了 api_key={'是' if llm_api_key else '否'}", flush=True)
+
     try:
         llm_overrides = _build_llm_overrides(llm_api_key)
         result = await call_assessment_ai_report(
@@ -519,8 +523,10 @@ async def _generate_assessment_ai_report(
             assessment_data=assessment_data,
             llm_overrides=llm_overrides,
         )
+        print(f"[API] ↗ 返回成功: type={assessment_type}", flush=True)
         return _ai_json_response(True, data=result)
     except Exception as e:
+        print(f"[API] ↗ 返回失败: type={assessment_type} -> {type(e).__name__}: {e}", flush=True)
         traceback.print_exc()
         return _ai_json_response(False, error=str(e))
 
@@ -606,6 +612,12 @@ async def stream_grip_ai_report_endpoint(request: GripAIReportRequest):
 if __name__ == "__main__":
     import uvicorn
 
-    port = int(os.environ.get("PYTHON_API_PORT", 8765))
+    # Default port must stay in 15001-49151. On Windows, winnat (Hyper-V / WSL2 /
+    # Docker NAT) reserves 100-port blocks inside the TCP dynamic port range and
+    # nothing can bind inside them -- listen() fails with EACCES while netstat shows
+    # no owner, and the reserved blocks shift on every boot. The old 8765 sits in an
+    # observed 8712-8811 block. See the port notes at the top of back-end/code/index.js.
+    # Electron passes the real port via PYTHON_API_PORT; this default is for standalone runs.
+    port = int(os.environ.get("PYTHON_API_PORT", 18765))
     print(f"Starting Sarcopenia Analysis API on port {port}...")
     uvicorn.run(app, host="127.0.0.1", port=port)

@@ -156,7 +156,25 @@ package-lock.json
 
 # macOS
 .DS_Store
-back-end/code/serial.txt
+# 串口线序/配置文件里带明文 sk- API 密钥。
+# 原来只忽略了 serial.txt 一个，但实际还存在 "serial copy.txt"、"serial copy 2.txt"
+# 这类副本，git add -A 会把它们连同密钥一起提交。改成通配覆盖全部副本。
+back-end/code/serial*.txt
+
+# 临时脚本，含明文密钥
+/test.py
+/generate_doc.py
+
+# 本地跑服务留下的日志
+/*.log
+back-end/code/python/app/algorithms/_tmp_test_output/
+back-end/code/python/app/algorithms/_tmp_prompt_capture/
+
+# 0810 报告设计交付包（源码参考，不进本仓库）
+/health-assessment-frontend/
+
+# 备份目录
+front-end/public/images_backup_before_asset_import/
 
 # LLM API Key 配置（含敏感信息）
 llm_settings.json

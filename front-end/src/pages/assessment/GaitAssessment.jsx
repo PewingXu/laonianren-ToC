@@ -3,6 +3,13 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useAssessment } from '../../contexts/AssessmentContext';
 import EChart from '../../components/ui/EChart';
 import GaitCanvas from '../../components/three/gait/GaitCanvas';
+// ── 0810 报告交付包页面，取代同文件内的 GaitReportContent ──
+// GaitReportContent 仍然导出、暂不删除（便于对照与回退），但已无处调用
+import { GaitReportPage } from '../../reports-v2/features/gait-report/pages/GaitReportPage';
+import { createInMemoryReportGateway } from '../../lib/localReportGateway';
+import { shareReportSummary } from '../../lib/reportBoundaries';
+// PDF 导出走 Chromium 原生打印（矢量、可搜索），不走 html2canvas
+import { ReportPdfButton, buildReportFileName } from '../../lib/reportPdf';
 import ParticleControlPanel from '../../components/three/shared/ParticleControlPanel';
 import { loadParams, saveParams, resetParams, loadTransform, saveTransform, resetTransform } from '../../components/three/shared/particleConfig';
 import { backendBridge } from '../../lib/BackendBridge';
@@ -715,8 +722,11 @@ export function GaitReportContent({ patientInfo, pythonResult: externalResult, o
    =============================================== */
 export default function GaitAssessment() {
   const navigate = useNavigate();
+  // 「测完即看」的报告滚动容器。PDF 导出的打印范围就是它 —— reportPdf.jsx 会在这个
+  // 节点上打 data-print-root，print.css 据此把外壳 header/footer 排除出纸面。
+  const reportScrollRef = useRef(null);
   const location = useLocation();
-  const { patientInfo, completeAssessment, updateAssessmentAiReport, assessments, deviceConnStatus } = useAssessment();
+  const { patientInfo, institution, completeAssessment, assessments, deviceConnStatus } = useAssessment();
   const isGlobalConnected = deviceConnStatus === 'connected';
   const viewReportMode = location.state?.viewReport && assessments.gait?.completed;
 
@@ -1090,9 +1100,21 @@ export default function GaitAssessment() {
     completeAssessment('gait', { completed: true, reportData: pythonResult }, { pythonResult }, assessmentIdRef.current);
   };
 
-  const handleGaitAiReportReady = useCallback((aiData) => {
-    updateAssessmentAiReport('gait', aiData, assessmentIdRef.current);
-  }, [updateAssessmentAiReport]);
+  /*
+   * 交付包报告页的数据源：刚测完还没落库，用内存态 gateway 直接喂 state 里的 pythonResult
+   * （步态的 reportData 就是 Python 侧的 render_data，completeAssessment 存的也是它）。
+   * 必须 useMemo，否则会在交付包 hook 的依赖数组里造成无限取数。
+   *
+   * 原 handleGaitAiReportReady（AI 文案回写）已移除：交付包页面没有 onAiReportReady 入口，
+   * 一期 AI 区块走其自带的保守降级文案，回写通道二期恢复。
+   */
+  const gaitReportGateway = useMemo(() => createInMemoryReportGateway({
+    type: 'gait',
+    reportData: pythonResult,
+    patient: patientInfo,
+    institution,
+    assessmentId: assessmentIdRef.current,
+  }), [pythonResult, patientInfo, institution]);
 
   // 清理
   useEffect(() => () => {
@@ -1118,15 +1140,17 @@ export default function GaitAssessment() {
               className="zeiss-btn-secondary text-xs py-2 px-4">
               {csvExporting ? '导出中...' : '保存CSV'}
             </button>
+            <ReportPdfButton
+              targetRef={reportScrollRef}
+              fileName={buildReportFileName(patientInfo?.name, '行走步态评估')}
+              title={`${patientInfo?.name || '未知'} 的行走步态评估报告`}
+            />
             <button onClick={() => navigate('/dashboard')} className="zeiss-btn-primary text-xs py-2 px-3 md:px-4">返回首页</button>
           </div>
         </header>
-        <main className="flex-1 min-h-0 overflow-auto">
-          <GaitReportContent
-              patientInfo={patientInfo}
-              pythonResult={pythonResult}
-              onAiReportReady={handleGaitAiReportReady}
-            />
+        <main ref={reportScrollRef} className="flex-1 min-h-0 overflow-auto">
+          {/* 不传 recordId：记录还没落库，身份由内存态 gateway 自己给 */}
+          <GaitReportPage gateway={gaitReportGateway} onShare={shareReportSummary} />
         </main>
       </div>
     );

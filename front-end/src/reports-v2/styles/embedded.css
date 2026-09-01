@@ -1,0 +1,33 @@
+/*
+ * 报告嵌入现有应用外壳（HistoryReportView / HistoryComprehensiveView）时的适配层。
+ * 这个文件不属于原交付包，是集成时新增的，改动都集中在这里，便于日后交付包升级时对照。
+ *
+ * 背景：交付包原本是独立整页应用，靠 body 或自带的 120vh 容器滚动。
+ * 本系统 index.css:57 设了 html, body, #root { overflow: hidden }，外壳 <main> 负责滚动，
+ * 两者直接叠加会导致报告滚不动、或出现内外两条滚动条。
+ *
+ * 注意：.health-overview 的 zoom: 0.8333 有意保留 —— 120vh × 0.8333 ≈ 100vh 是交付包
+ * 刻意设计的画布换算（1440px 设计稿贴合视口），这是 Electron/Chromium 环境，zoom 可用。
+ * 换成 transform: scale() 不参与布局，会破坏滚动高度计算。html2canvas 对 zoom 的处理
+ * 单独在 pdfExport.jsx 的 onclone 钩子里解决，不在这里动 CSS。
+ */
+
+/* 总览页：去掉自带的固定高度内滚动容器，改由外壳 <main> 统一滚动 */
+.health-overview {
+  min-height: 0;
+}
+
+.health-overview__scroll {
+  height: auto;
+  overflow: visible;
+}
+
+/*
+ * 站立报告原本在 body 上设了 min-width: 1200px。外壳 body 是 overflow: hidden，
+ * 撑宽后不会滚动、只会把右侧内容裁掉，改为交给 <main> 横向滚动。
+ * 与 standing-report.css 的 body:has(.standing-report) 选择器特异性相同，
+ * 靠 index.css 中 embedded.css 的引入顺序在后取胜。
+ */
+body:has(.standing-report) {
+  min-width: 0;
+}

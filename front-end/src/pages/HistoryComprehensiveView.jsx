@@ -1,7 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { getRecord } from '../lib/historyService';
-import ComprehensiveReport from '../components/report/ComprehensiveReport';
+import { localReportGateway } from '../lib/localReportGateway';
+import { shareReportSummary, saveAssessmentReminder } from '../lib/reportBoundaries';
+// PDF 导出走 Chromium 原生打印（矢量、可搜索），不走 html2canvas
+import { ReportPdfButton, buildReportFileName } from '../lib/reportPdf';
+// ── 0810 报告交付包的总览页，取代原 ComprehensiveReport ──
+// 页面内的能力卡跳转用 buildReportRoute()，生成的正是 /history/report?id=&type=，
+// 与本系统现有路由逐字一致，所以不需要新增路由。
+import { HealthOverviewPage } from '../reports-v2/features/health-overview/pages/HealthOverviewPage';
 
 /**
  * 历史综合报告查看页面
@@ -14,6 +21,8 @@ export default function HistoryComprehensiveView() {
 
   const [record, setRecord] = useState(null);
   const [loading, setLoading] = useState(true);
+  // 打印范围：指向下面承载报告的滚动容器，print.css 靠这个节点上的 data-print-root 定界
+  const reportScrollRef = useRef(null);
 
   useEffect(() => {
     if (!recordId) {
@@ -84,6 +93,11 @@ export default function HistoryComprehensiveView() {
           {record?.dateStr && (
             <span className="text-sm" style={{ color: 'var(--text-muted)' }}>{record.dateStr}</span>
           )}
+          <ReportPdfButton
+            targetRef={reportScrollRef}
+            fileName={buildReportFileName(patientName, '综合评估报告', record?.dateStr)}
+            title={`${patientName} 的综合评估报告`}
+          />
           <button onClick={handleBack} className="zeiss-btn-ghost text-xs flex items-center gap-1.5">
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 17l-5-5m0 0l5-5m-5 5h12" />
@@ -94,8 +108,14 @@ export default function HistoryComprehensiveView() {
       </header>
 
       {/* Report Content */}
-      <main className="flex-1 min-h-0 overflow-hidden">
-        <ComprehensiveReport record={record} onClose={handleBack} />
+      {/* 总览页自带 min-height:120vh 的画布，index.css 又禁掉了 body 滚动，滚动条只能挂在这里 */}
+      <main ref={reportScrollRef} className="flex-1 min-h-0 overflow-auto">
+        <HealthOverviewPage
+          gateway={localReportGateway}
+          recordId={recordId}
+          onShare={shareReportSummary}
+          onSaveReminder={saveAssessmentReminder}
+        />
       </main>
 
       <div className="h-6 flex items-center px-6 shrink-0 z-10">

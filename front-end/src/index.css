@@ -321,9 +321,13 @@ body {
   }
 }
 
+/* 4 个评估模块：1024 起一行排满。
+   不用 3 列是因为 4 张卡会变成 3+1，末尾孤立一张；
+   也不再需要原来 1440 才生效的 5 列断点 —— 4 列在 1200px 容器里每列约 285px，
+   比原先 5 列的 224px 还宽松，所以断点可以直接下移到 1024。 */
 @media (min-width: 1024px) {
   .dashboard-grid {
-    gap: 24px;
+    gap: 20px;
     grid-template-columns: repeat(4, 1fr);
   }
 }
@@ -338,6 +342,92 @@ body {
     padding: 12px 16px !important;
   }
 }
+
+/* ═══════════════════════════════════════════
+   Dashboard 视觉主题 —— 对齐 0810 报告交付包的设计语言
+   ───────────────────────────────────────────
+   做法：只在 .dashboard-v2 子树内重定义 --zeiss-* / --bg-* / --text-* 等变量，
+   不碰上面任何一条 .zeiss-* 规则本身。
+
+   原因：.zeiss-card / .zeiss-btn-* / .zeiss-input / .zeiss-dialog 这些类被 20 多个文件
+   共用（历史记录、4 个采集页等），直接改规则会全站外溢。CSS 自定义属性沿 DOM 继承，所以在首页根节点上换一套取值，
+   共用类在首页自动呈现报告页配色，其他页面读到的仍是 :root 里的原值。
+
+   报告交付包（src/reports-v2/）没有引用任何一个 --zeiss-* / --text-* / --bg-* 变量
+   （已全量 grep 确认），因此首页里内嵌的总览页弹层不受这里影响。
+   ═══════════════════════════════════════════ */
+.dashboard-v2 {
+  /* 主色：ZEISS 蓝 #0066CC → 报告页的自然绿 #4D8D54（tailwind natural-green） */
+  --zeiss-blue: #4D8D54;
+  --zeiss-blue-light: #EAF3EA;
+  --zeiss-blue-hover: #3F7546;
+  --zeiss-blue-50: #F3F8F3;
+  --zeiss-blue-100: #EAF3EA;
+  --zeiss-blue-500: #4D8D54;
+  --zeiss-blue-600: #3F7546;
+
+  /* 画布与卡面：取总览页的 surface 体系 */
+  --bg-primary: #F8FAF3;
+  --bg-secondary: #FFFFFF;
+  --bg-tertiary: #F8FAF3;
+  --bg-hover: #EFF3EA;
+
+  /* 文字：报告页 ink / on-surface-variant / muted */
+  --text-primary: #191D18;
+  --text-secondary: #41493F;
+  --text-tertiary: #5F5E5B;
+  --text-muted: #8C8C8C;
+
+  /* 描边：outline-variant #C0C9BC */
+  --border-light: rgb(192 201 188 / 45%);
+  --border-medium: #C0C9BC;
+
+  /* 卡片质感：交付包统一用 soft-shadow（0 10px 40px -10px rgb(0 0 0 / 4%)） */
+  --shadow-xs: 0 1px 2px rgb(25 29 24 / 4%);
+  --shadow-sm: 0 10px 40px -10px rgb(0 0 0 / 4%);
+  --shadow-md: 0 14px 44px -12px rgb(25 29 24 / 10%);
+  --shadow-lg: 0 20px 56px -14px rgb(25 29 24 / 14%);
+  --shadow-xl: 0 24px 64px -16px rgb(25 29 24 / 18%);
+
+  /* 圆角：交付包能力卡 32px、大区块 40px。首页卡面更小，收到 24px 免得头重脚轻 */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 24px;
+  --radius-xl: 32px;
+
+  /* 状态色改用报告页取值，颜色语义（绿=完成/在线、橙=部分、红=故障）保持不变 */
+  --success: #4D8D54;
+  --success-light: #EAF3EA;
+  --warning: #E09038;
+  --warning-light: #FFF5E6;
+  --danger: #BA1A1A;
+  --danger-light: #FFDAD6;
+
+  letter-spacing: 0;
+  font-family: "Be Vietnam Pro", "Microsoft YaHei", "PingFang SC", sans-serif;
+}
+
+/* 按钮改胶囊形：与总览页「分享报告」按钮（border-radius: 9999px）同语言 */
+.dashboard-v2 .zeiss-btn-primary,
+.dashboard-v2 .zeiss-btn-secondary,
+.dashboard-v2 .zeiss-btn-ghost { border-radius: 9999px; }
+
+/* 卡片描边加实一档：交付包能力卡是 1px solid rgb(192 201 188 / 20%)。
+   弹窗圆角由上面的 --radius-xl 接管，这里不写死，小屏媒体查询仍能收到 24px */
+.dashboard-v2 .zeiss-card { border-color: rgb(192 201 188 / 55%); }
+
+/* 遮罩底色是写死的冷灰 rgba(245,246,248,.85)，跟新画布的暖白偏绿对不上 */
+.dashboard-v2 .zeiss-overlay { background: rgb(248 250 243 / 88%); }
+
+/* 输入框/下拉也跟着走胶囊+新描边，保持弹窗内视觉一致 */
+.dashboard-v2 .zeiss-input,
+.dashboard-v2 .zeiss-select {
+  border-width: 1px;
+  border-color: #C0C9BC;
+  border-radius: 14px;
+}
+.dashboard-v2 .zeiss-input:focus,
+.dashboard-v2 .zeiss-select:focus { box-shadow: 0 0 0 3px rgb(77 141 84 / 16%); }
 
 /* ─── 通用工具类 ─── */
 .text-responsive-sm { font-size: clamp(11px, 1.2vw, 13px); }

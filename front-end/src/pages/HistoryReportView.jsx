@@ -1,11 +1,18 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { getRecord, updateAssessmentAiReport } from '../lib/historyService';
 import { backendBridge } from '../lib/BackendBridge';
-import GripReport from '../components/report/GripReport';
-import StandingReport from '../components/report/StandingReport';
-import SitStandReport from '../components/report/SitStandReport';
-import { GaitReportContent } from './assessment/GaitAssessment';
+import { localReportGateway, REPORT_TYPES } from '../lib/localReportGateway';
+import { shareReportSummary } from '../lib/reportBoundaries';
+// PDF 导出走 Chromium 原生打印（矢量、可搜索），不走 html2canvas。
+import { ReportPdfButton, buildReportFileName } from '../lib/reportPdf';
+// ── 0810 报告交付包页面（src/reports-v2/）──
+// 四项报告全部走 reports-v2 的交付包原生页面。
+// 这些页面自己通过 gateway 取数并处理 加载/失败/数据不足 三态，不接收 reportData 做展示。
+import { GripReportPage } from '../reports-v2/features/grip-report/pages/GripReportPage';
+import { SitStandReportPage } from '../reports-v2/features/sit-stand-report/pages/SitStandReportPage';
+import { StandingReportPage } from '../reports-v2/features/standing-report/pages/StandingReportPage';
+import { GaitReportPage } from '../reports-v2/features/gait-report/pages/GaitReportPage';
 
 const TYPE_LABELS = {
   grip: '握力评估',
@@ -22,6 +29,8 @@ export default function HistoryReportView() {
   const recordId = searchParams.get('id');
   const assessmentType = searchParams.get('type');
   const isPageMountedRef = useRef(true);
+  // 打印范围：指向下面承载报告的滚动容器，print.css 靠这个节点上的 data-print-root 定界
+  const reportScrollRef = useRef(null);
 
   // 从后端数据库获取记录
   const [record, setRecord] = useState(null);
@@ -52,25 +61,34 @@ export default function HistoryReportView() {
   }, [recordId]);
 
   const patientName = record?.patientName || '未知';
-  const patientInfo = record ? {
+  // 目前无人消费：0810 交付包的四个报告页一期不接 AI（AI 区块走其自带的降级文案）。
+  // 保留是给二期接 AI 用的 —— 届时报告页的 AI effect 会依赖它，
+  // 而 useMemo 是必需的：每次渲染都新建对象会让那个 effect 不断重跑。
+  const patientInfo = useMemo(() => (record ? {
     name: record.patientName,
     gender: record.patientGender,
     age: record.patientAge,
     weight: record.patientWeight,
-  } : { name: '未知' };
+  } : { name: '未知' }), [record]);
 
   // 从历史记录中提取报告数据
+  // 两种存法都真实存在（assessmentScoring.js 里同样有这两条兜底），与 localReportGateway 口径保持一致，
+  // 否则会出现「外壳判定无数据、交付包页面其实能渲染」的错位
   const assessmentData = record?.assessments?.[assessmentType];
-  const reportData = assessmentData?.report?.reportData || null;
+  const reportData = assessmentData?.report?.reportData || assessmentData?.reportData || null;
+
+  // 该类型是否已换成 reports-v2 页面（四项全部是）
+  const isReportV2 = REPORT_TYPES.includes(assessmentType);
 
   const handleBack = () => navigate('/history');
 
-  // AI 报告生成完成后，补存到历史记录
-  const handleAiReportReady = useCallback((aiData) => {
+  // AI 报告生成完成后，补存到历史记录。
+  // 同 patientInfo：一期没有页面调它，保留是给二期给四个报告页接 AI 时用的回写通道。
+  const handleAiReportReady = useCallback(async (aiData) => {
     if (!record || !assessmentType) return;
     try {
-      // 更新后端数据库
-      const ok = updateAssessmentAiReport(record.id, assessmentType, aiData);
+      // 写回存储（现为异步：写 IndexedDB）
+      const ok = await updateAssessmentAiReport(record.id, assessmentType, aiData);
       if (!ok) return;
 
       if (isPageMountedRef.current) {
@@ -172,14 +190,17 @@ export default function HistoryReportView() {
     }
 
     switch (assessmentType) {
+      // ── 四项走 0810 交付包页面 ──
+      // 患者信息不用透传：交付包页面从 gateway 返回的记录里自己读。
+      // 一期不接 onAiReportReady（交付包页面没有这个入口），AI 区块走其自带的保守降级文案。
       case 'grip':
-        return <GripReport patientName={patientName} patientInfo={patientInfo} onClose={handleBack} reportData={reportData} onAiReportReady={handleAiReportReady} />;
+        return <GripReportPage gateway={localReportGateway} recordId={recordId} onShare={shareReportSummary} />;
       case 'standing':
-        return <StandingReport patientInfo={patientInfo} onClose={handleBack} reportData={reportData} onAiReportReady={handleAiReportReady} />;
+        return <StandingReportPage gateway={localReportGateway} recordId={recordId} onShare={shareReportSummary} />;
       case 'sitstand':
-        return <SitStandReport patientInfo={patientInfo} reportData={reportData} onClose={handleBack} onAiReportReady={handleAiReportReady} />;
+        return <SitStandReportPage gateway={localReportGateway} recordId={recordId} onShare={shareReportSummary} />;
       case 'gait':
-        return <GaitReportContent patientInfo={patientInfo} pythonResult={reportData} onClose={handleBack} onAiReportReady={handleAiReportReady} />;
+        return <GaitReportPage gateway={localReportGateway} recordId={recordId} onShare={shareReportSummary} />;
       default:
         return (
           <div className="flex-1 flex items-center justify-center">
@@ -215,6 +236,14 @@ export default function HistoryReportView() {
           {record?.dateStr && (
             <span className="text-sm" style={{ color: 'var(--text-muted)' }}>{record.dateStr}</span>
           )}
+          {/* 五项报告都走 reports-v2，PDF 一律用 Chromium 原生打印（矢量、可搜索） */}
+          {isReportV2 && reportData && (
+            <ReportPdfButton
+              targetRef={reportScrollRef}
+              fileName={buildReportFileName(patientName, TYPE_LABELS[assessmentType], record?.dateStr)}
+              title={`${patientName} 的${TYPE_LABELS[assessmentType] || '评估'}报告`}
+            />
+          )}
           {assessmentIds && (
             <button onClick={handleExportCsv} disabled={csvExporting}
               className="text-xs flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-semibold transition-all"
@@ -235,7 +264,14 @@ export default function HistoryReportView() {
       </header>
 
       {/* Report Content */}
-      <main className="flex-1 min-h-0 overflow-hidden">
+      {/*
+        交付包页面是按整页应用写的，靠 body 滚动，而 index.css:57 把 html/body/#root 都设成
+        overflow:hidden，所以必须由这里的 <main> 承担滚动。站立报告原本还在 body 上要求
+        min-width:1200px（已在 embedded.css 里解除），窄窗口时需要横向滚动，故两轴都放开。
+        五项报告现在都是 reports-v2 页面，isReportV2 恒真；三元式保留是给未知 type 兜底
+        （renderReport 的 default 分支会渲染一段提示文案，不需要滚动）。
+      */}
+      <main ref={reportScrollRef} className={`flex-1 min-h-0 ${isReportV2 ? 'overflow-auto' : 'overflow-hidden'}`}>
         {renderReport()}
       </main>
 

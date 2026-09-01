@@ -1,0 +1,1656 @@
+body:has(.grip-report) {
+  margin: 0;
+  color: #191d18;
+  background: #faf9f6;
+}
+
+.grip-report,
+.grip-report * {
+  box-sizing: border-box;
+}
+
+.grip-report {
+  --grip-ink: #191d18;
+  --grip-text: #41493f;
+  --grip-muted: #8c8c8c;
+  --grip-line: #e6e9e2;
+  --grip-panel: #fff;
+  --grip-surface: #f8faf3;
+  --grip-green: #4d8d54;
+  --grip-green-soft: #eaf3ea;
+  --grip-blue: #7da8d8;
+  --grip-orange: #f8a36d;
+  --grip-purple: #a689b5;
+  width: 1200px;
+  min-height: 100%;
+  margin: 0 auto;
+  overflow-x: hidden;
+  color: var(--grip-ink);
+  background: #faf9f6;
+  font-family: "Be Vietnam Pro", "PingFang SC", "Microsoft YaHei", sans-serif;
+  font-size: 14px;
+  letter-spacing: 0;
+}
+
+.grip-report button,
+.grip-report a {
+  color: inherit;
+  font: inherit;
+}
+
+.grip-report button {
+  cursor: pointer;
+}
+
+.grip-report button:focus-visible,
+.grip-report a:focus-visible {
+  outline: 3px solid rgba(77, 141, 84, 0.3);
+  outline-offset: 3px;
+}
+
+.grip-report svg {
+  display: block;
+}
+
+.grip-report__header {
+  display: flex;
+  width: 100%;
+  height: 70px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 32px;
+}
+
+.grip-report__header-leading,
+.grip-report__header-actions {
+  display: flex;
+  align-items: center;
+}
+
+.grip-report__header-leading {
+  gap: 16px;
+}
+
+.grip-report__header-actions {
+  gap: 12px;
+}
+
+.grip-report__icon-button {
+  display: grid;
+  width: 40px;
+  height: 40px;
+  place-items: center;
+  border: 1px solid var(--grip-line);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 6px 18px rgba(42, 53, 44, 0.06);
+  padding: 0;
+  text-decoration: none;
+}
+
+.grip-report__icon-button svg {
+  width: 21px;
+  height: 21px;
+  stroke-width: 2;
+}
+
+.grip-report__title-group h1 {
+  margin: 0;
+  font-size: 24px;
+  line-height: 32px;
+  font-weight: 900;
+}
+
+.grip-report__title-group p {
+  margin: 2px 0 0;
+  color: var(--grip-muted);
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.grip-report__share-button {
+  display: inline-flex;
+  height: 42px;
+  min-width: 125px;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  border: 1px solid var(--grip-line);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 6px 18px rgba(42, 53, 44, 0.055);
+  font-size: 12px;
+  line-height: 20px;
+  font-weight: 800;
+}
+
+.grip-report__share-button svg {
+  width: 19px;
+  height: 19px;
+}
+
+.grip-report__calendar-button {
+  width: 44px;
+  height: 44px;
+}
+
+.grip-report__content {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  gap: 24px;
+  padding: 0 32px 48px;
+}
+
+.grip-report__hero {
+  display: grid;
+  min-height: 500px;
+  grid-template-columns: 55fr 45fr;
+  overflow: hidden;
+  border-radius: 24px;
+  background: var(--grip-panel);
+  box-shadow: 0 12px 34px rgba(42, 53, 44, 0.07);
+}
+
+.grip-report__hero-summary {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  justify-content: center;
+  padding: 52px 46px 48px;
+}
+
+.grip-report__hero-kicker {
+  display: inline-flex;
+  align-self: flex-start;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 26px;
+  border-radius: 999px;
+  background: #f3f6f1;
+  padding: 8px 14px;
+  color: var(--grip-ink);
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.grip-report__hero-kicker svg {
+  width: 18px;
+  height: 18px;
+  color: var(--grip-green);
+  stroke-width: 2;
+}
+
+.grip-report__hero-summary h2 {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0;
+  margin: 0;
+  font-size: 48px;
+  line-height: 58px;
+  font-weight: 900;
+  white-space: normal;
+}
+
+.grip-report__hero-summary h2 > span:first-child {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.grip-report__hero-summary h2 strong {
+  color: var(--grip-green);
+  font-weight: inherit;
+}
+
+.grip-report__hero-summary h2 .grip-report__hero-emoji {
+  margin-left: 18px;
+  font-size: 42px;
+  line-height: 1;
+}
+
+.grip-report__hero-lead {
+  max-width: 500px;
+  margin: 24px 0 0;
+  color: var(--grip-text);
+  font-size: 16px;
+  line-height: 28px;
+}
+
+.grip-report__score-label {
+  display: block;
+  color: var(--grip-text);
+  font-size: 15px;
+  line-height: 22px;
+}
+
+.grip-report__score-row {
+  display: flex;
+  justify-content: center;
+  align-items: baseline;
+  gap: 5px;
+  margin-top: 14px;
+}
+
+.grip-report__score-value {
+  color: var(--grip-green);
+  font-size: 64px;
+  line-height: 1;
+  font-weight: 800;
+}
+
+.grip-report__score-unit {
+  color: var(--grip-ink);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.grip-report__score-card > em {
+  margin-top: 12px;
+  border-radius: 999px;
+  background: var(--grip-green-soft);
+  padding: 5px 14px;
+  color: #286834;
+  font-size: 14px;
+  font-style: normal;
+  font-weight: 800;
+}
+
+.grip-report__peer-summary,
+.grip-report__peer-unavailable {
+  margin: 15px 0 0;
+  color: var(--grip-text);
+  font-size: 13px;
+  line-height: 20px;
+  white-space: nowrap;
+}
+
+.grip-report__peer-summary strong {
+  color: var(--grip-green);
+}
+
+.grip-report__findings {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-top: 46px;
+}
+
+.grip-report__findings article {
+  display: inline-flex;
+  min-width: 0;
+  min-height: 54px;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid #dfe5dc;
+  border-radius: 12px;
+  background: #fafbf8;
+  padding: 0 14px;
+  max-width: 100%;
+}
+
+.grip-report__finding-icon {
+  display: grid;
+  width: 22px;
+  height: 22px;
+  flex: 0 0 22px;
+  place-items: center;
+  color: var(--grip-green);
+}
+
+.grip-report__finding-icon svg {
+  width: 21px;
+  height: 21px;
+  stroke-width: 2;
+}
+
+.grip-report__findings h3 {
+  margin: 0;
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+.grip-report__hero-media {
+  position: relative;
+  min-width: 0;
+  height: 100%;
+  overflow: hidden;
+  margin: 0;
+  background: var(--grip-line);
+}
+
+.grip-report__hero-media img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.grip-report__hero-media > span {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.12), transparent 24%);
+  pointer-events: none;
+}
+
+.grip-report__score-card {
+  position: absolute;
+  z-index: 2;
+  top: 50%;
+  right: 30px;
+  display: flex;
+  width: 190px;
+  min-height: 226px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(230, 233, 226, 0.92);
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 18px 40px rgba(42, 53, 44, 0.16);
+  padding: 24px 18px;
+  text-align: center;
+  transform: translateY(-50%);
+}
+
+.grip-report__score-card::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: -12px -14px 8px 14px;
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.68);
+  box-shadow: 0 10px 28px rgba(42, 53, 44, 0.08);
+}
+
+.grip-report__metrics-section > h3 {
+  margin: 0 0 16px;
+  padding: 0 8px;
+  font-size: 20px;
+  line-height: 28px;
+  font-weight: 700;
+}
+
+.grip-report__metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.grip-report__metric-card {
+  display: flex;
+  min-width: 0;
+  min-height: 320px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  overflow: hidden;
+  border-radius: 24px;
+  background: var(--grip-panel);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03);
+  padding: 24px;
+}
+
+.grip-report__metric-main,
+.grip-report__metric-footer {
+  width: 100%;
+}
+
+/*
+ * 四张指标卡要逐行对齐（标题一条线、数值一条线、图表一条线）。
+ *
+ * 原本是 flex 纵向堆叠，每块高度由内容决定 —— 只要有一张卡的某块比别人高
+ * （例如「握持均值」的状态胶片换行成两行），它下面所有内容就整体下移，
+ * 四张卡看起来参差不齐。
+ *
+ * 改成固定行高的 grid：标题 / 数值 / 同龄对比 / 图表(1fr)。
+ * 行高写死后，四张卡的每一行都落在同一条水平线上，与内容多少无关。
+ */
+.grip-report__metric-main {
+  display: grid;
+  grid-template-rows: 24px 48px 18px 1fr;
+  row-gap: 16px;
+  justify-items: center;
+  align-items: center;
+}
+
+.grip-report__metric-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  /* 行高已由 grid-template-rows 保证，不再用 margin 撑开 */
+  margin-bottom: 0;
+}
+
+.grip-report__metric-header > span {
+  display: grid;
+  width: 24px;
+  height: 24px;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--grip-green);
+  color: #fff;
+}
+
+.grip-report__metric-header svg {
+  width: 13px;
+  height: 13px;
+}
+
+.grip-report__metric-header h4 {
+  margin: 0;
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 700;
+}
+
+.grip-report__metric-value {
+  display: flex;
+  width: 100%;
+  height: 48px;
+  align-items: baseline;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 0;
+}
+
+.grip-report__metric-value strong {
+  /* 数值最长是 6 位（如 258.18），允许它压缩而不是把胶片挤到换行 */
+  min-width: 0;
+  color: var(--grip-green);
+  font-size: 40px;
+  line-height: 48px;
+  white-space: nowrap;
+}
+
+.grip-report__metric-value > span {
+  color: var(--grip-text);
+  font-size: 14px;
+}
+
+.grip-report__metric-value em {
+  /*
+   * 状态胶片不能换行。原来「一般」会被挤成「一/般」竖排两行，
+   * 把整行撑到 2 倍高，导致这张卡下面所有内容比别的卡低一截
+   * —— 四卡不齐的直接原因。
+   */
+  flex: 0 0 auto;
+  align-self: center;
+  border-radius: 999px;
+  background: var(--grip-green-soft);
+  padding: 4px 10px;
+  color: var(--grip-green);
+  font-size: 12px;
+  line-height: 18px;
+  font-style: normal;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.grip-report__metric-summary {
+  display: flex;
+  height: 18px;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  color: var(--grip-text);
+  font-size: 12px;
+  line-height: 18px;
+  text-align: center;
+  /* 同龄对比缺失时文案较长，超出就省略，不允许换行破坏行高 */
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.grip-report__metric-summary strong {
+  color: var(--grip-green);
+}
+
+.grip-report__metric-card--average .grip-report__metric-header > span {
+  background: var(--grip-blue);
+}
+
+.grip-report__metric-card--average .grip-report__metric-value strong {
+  color: var(--grip-blue);
+}
+
+.grip-report__metric-card--difference .grip-report__metric-header > span {
+  background: var(--grip-orange);
+}
+
+.grip-report__metric-card--difference .grip-report__metric-value strong {
+  color: var(--grip-orange);
+}
+
+.grip-report__metric-card--endurance .grip-report__metric-header > span {
+  background: var(--grip-purple);
+}
+
+.grip-report__metric-card--endurance .grip-report__metric-value strong {
+  color: var(--grip-purple);
+}
+
+.grip-report__gauge {
+  display: flex;
+  width: 100%;
+  height: 96px;
+  flex-direction: column;
+  align-items: center;
+}
+
+.grip-report__gauge svg {
+  width: 160px;
+  height: 80px;
+}
+
+.grip-report__gauge > div {
+  display: flex;
+  width: 160px;
+  justify-content: space-between;
+  margin-top: 4px;
+  color: var(--grip-muted);
+  font-size: 10px;
+}
+
+.grip-report__gauge strong {
+  color: var(--grip-orange);
+}
+
+.grip-report__trial-bars {
+  display: flex;
+  width: 100%;
+  height: 96px;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 16px;
+}
+
+.grip-report__trial-bar {
+  display: flex;
+  height: 96px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+}
+
+.grip-report__trial-bar span,
+.grip-report__trial-bar small {
+  color: var(--grip-muted);
+  font-size: 10px;
+  line-height: 12px;
+}
+
+.grip-report__trial-bar i {
+  width: 24px;
+  border-radius: 2px 2px 0 0;
+  background: rgba(125, 168, 216, 0.65);
+}
+
+.grip-report__difference-ring {
+  position: relative;
+  display: grid;
+  width: 128px;
+  height: 128px;
+  place-items: center;
+}
+
+.grip-report__difference-ring > svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.grip-report__difference-content {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.grip-report__hand-values {
+  display: flex;
+  gap: 10px;
+}
+
+/* 每只手一列：图标 / 标签 / 数值+单位，三行纵向，全部不换行 */
+.grip-report__hand-values > span {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  color: var(--grip-muted);
+  font-size: 8px;
+  white-space: nowrap;
+}
+
+.grip-report__hand-values svg {
+  width: 16px;
+  height: 16px;
+  color: var(--grip-orange);
+}
+
+.grip-report__hand-values em {
+  color: var(--grip-muted);
+  font-size: 9px;
+  font-style: normal;
+  line-height: 11px;
+}
+
+.grip-report__hand-values b {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 1px;
+  color: var(--grip-ink);
+  font-size: 10px;
+  line-height: 12px;
+}
+
+.grip-report__hand-values small {
+  color: var(--grip-muted);
+  font-size: 8px;
+  line-height: 12px;
+}
+
+.grip-report__difference-content p {
+  display: flex;
+  align-items: baseline;
+  margin: 0;
+  color: var(--grip-muted);
+  font-size: 8px;
+}
+
+.grip-report__difference-content p b,
+.grip-report__difference-content p span {
+  color: var(--grip-ink);
+  font-size: 10px;
+}
+
+.grip-report__endurance-line {
+  width: 100%;
+  height: 96px;
+  padding: 0 8px;
+}
+
+.grip-report__endurance-line svg {
+  width: 100%;
+  height: 76px;
+  overflow: visible;
+}
+
+.grip-report__endurance-line > div {
+  display: flex;
+  justify-content: space-between;
+  color: var(--grip-muted);
+  font-size: 8px;
+}
+
+.grip-report__metric-footer {
+  margin-top: 16px;
+  text-align: center;
+}
+
+.grip-report__metric-reference {
+  min-height: 28px;
+}
+
+.grip-report__metric-reference p {
+  margin: 0;
+  color: var(--grip-muted);
+  font-size: 10px;
+  line-height: 14px;
+}
+
+.grip-report__metric-footer button {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  margin-top: 16px;
+  border: 0;
+  border-top: 1px solid var(--grip-surface);
+  background: transparent;
+  padding: 16px 0 0;
+  color: var(--grip-ink);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.grip-report__metric-footer button svg {
+  width: 14px;
+  height: 14px;
+}
+
+.grip-report__professional-analysis > h2 {
+  margin: 0 0 16px;
+  padding: 0 8px;
+  font-size: 20px;
+  line-height: 28px;
+  font-weight: 700;
+}
+
+.grip-report__advice-section > h2 {
+  margin: 0 0 16px;
+  padding: 0 8px;
+  font-size: 20px;
+  line-height: 28px;
+  font-weight: 700;
+}
+
+.grip-report__advice-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 24px;
+}
+
+.grip-report__advice-card {
+  min-width: 0;
+  border-radius: 24px;
+  background: var(--grip-panel);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03);
+  padding: 24px;
+}
+
+.grip-report__advice-heading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.grip-report__advice-card h3 {
+  margin: 0;
+  font-size: 18px;
+  line-height: 28px;
+  font-weight: 700;
+}
+
+.grip-report__ai-summary {
+  min-width: 0;
+}
+
+.grip-report__ai-summary-card {
+  overflow: hidden;
+  border: 1px solid #dfe5df;
+  border-radius: 24px;
+  background: var(--grip-panel);
+  box-shadow:
+    0 14px 34px rgba(38, 55, 46, 0.07),
+    inset 0 0 30px rgba(232, 239, 233, 0.38);
+  padding: 28px 32px 26px;
+}
+
+.grip-report__ai-summary-title-row,
+.grip-report__ai-summary-copy,
+.grip-report__ai-summary-focus {
+  display: flex;
+  align-items: flex-start;
+}
+
+.grip-report__ai-summary-title-row {
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 24px;
+}
+
+.grip-report__ai-summary-title-row h2 {
+  margin: 0;
+  font-size: 22px;
+  line-height: 30px;
+  font-weight: 900;
+  letter-spacing: 0;
+}
+
+.grip-report__ai-summary-icon {
+  display: grid;
+  width: 48px;
+  height: 48px;
+  flex: 0 0 48px;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--grip-green-soft);
+  color: var(--grip-green);
+}
+
+.grip-report__ai-summary-icon svg {
+  width: 27px;
+  height: 27px;
+  stroke-width: 2.2;
+}
+
+.grip-report__ai-summary-main {
+  display: grid;
+  min-height: 190px;
+  grid-template-columns: minmax(0, 1fr) 220px;
+  align-items: center;
+  gap: 32px;
+}
+
+.grip-report__ai-summary-copy {
+  min-width: 0;
+  gap: 16px;
+}
+
+.grip-report__ai-summary-copy > div,
+.grip-report__ai-summary-focus > div {
+  min-width: 0;
+}
+
+.grip-report__ai-summary-copy h3,
+.grip-report__ai-summary-focus h3,
+.grip-report__ai-summary-copy p,
+.grip-report__ai-summary-focus p {
+  margin: 0;
+  letter-spacing: 0;
+  overflow-wrap: anywhere;
+}
+
+.grip-report__ai-summary-copy h3 {
+  color: var(--grip-green);
+  font-size: 26px;
+  line-height: 36px;
+  font-weight: 900;
+}
+
+.grip-report__ai-summary-copy p {
+  max-width: 700px;
+  margin-top: 14px;
+  color: var(--grip-text);
+  font-size: 16px;
+  line-height: 30px;
+  font-weight: 500;
+}
+
+.grip-report__ai-summary-illustration {
+  position: relative;
+  width: 220px;
+  height: 190px;
+  justify-self: end;
+}
+
+.grip-report__ai-summary-report {
+  position: absolute;
+  top: 8px;
+  right: 22px;
+  width: 146px;
+  height: 174px;
+  border: 3px solid #d5e2d6;
+  border-radius: 14px;
+  background: #fbfdfb;
+  box-shadow: 0 12px 22px rgba(72, 91, 76, 0.14);
+  padding: 22px 18px;
+}
+
+.grip-report__ai-summary-chart {
+  width: 84px;
+  height: 52px;
+  color: #87b78c;
+  stroke-width: 1.8;
+}
+
+.grip-report__ai-summary-report-line {
+  display: block;
+  width: 70px;
+  height: 7px;
+  margin-top: 10px;
+  border-radius: 999px;
+  background: #d9e6da;
+}
+
+.grip-report__ai-summary-report-line--long {
+  width: 94px;
+  margin-top: 8px;
+}
+
+.grip-report__ai-summary-report-line--short {
+  width: 52px;
+  margin-top: 8px;
+}
+
+.grip-report__ai-summary-report-check {
+  position: absolute;
+  right: -13px;
+  bottom: -11px;
+  display: grid;
+  width: 42px;
+  height: 42px;
+  place-items: center;
+  border: 4px solid var(--grip-panel);
+  border-radius: 50%;
+  background: var(--grip-green);
+  color: #fff;
+}
+
+.grip-report__ai-summary-report-check svg {
+  width: 23px;
+  height: 23px;
+}
+
+.grip-report__ai-summary-sparkle {
+  position: absolute;
+  width: 25px;
+  height: 25px;
+  color: #9fc8a3;
+  stroke-width: 1.7;
+}
+
+.grip-report__ai-summary-sparkle--left {
+  left: 4px;
+  bottom: 26px;
+}
+
+.grip-report__ai-summary-sparkle--right {
+  top: 18px;
+  right: 0;
+}
+
+.grip-report__ai-summary-divider {
+  height: 1px;
+  margin: 22px 0;
+  background: var(--grip-line);
+}
+
+.grip-report__ai-summary-focus {
+  gap: 16px;
+}
+
+.grip-report__ai-summary-focus h3 {
+  color: var(--grip-green);
+  font-size: 20px;
+  line-height: 28px;
+  font-weight: 900;
+}
+
+.grip-report__ai-summary-focus p {
+  margin-top: 8px;
+  color: var(--grip-text);
+  font-size: 15px;
+  line-height: 28px;
+  font-weight: 500;
+}
+
+.grip-report__advice-card {
+  min-height: 212px;
+  border-top: 4px solid var(--grip-green);
+}
+
+.grip-report__advice-heading > svg {
+  width: 32px;
+  height: 32px;
+}
+
+.grip-report__advice-card ul {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.grip-report__advice-card li {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  color: var(--grip-text);
+  font-size: 14px;
+  line-height: 22px;
+}
+
+.grip-report__advice-card li svg {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+  margin-top: 3px;
+}
+
+.grip-report__advice-card--green .grip-report__advice-heading > svg,
+.grip-report__advice-card--green li svg {
+  color: var(--grip-green);
+}
+
+.grip-report__advice-card--orange {
+  border-top-color: var(--grip-orange);
+}
+
+.grip-report__advice-card--orange .grip-report__advice-heading > svg,
+.grip-report__advice-card--orange li svg {
+  color: var(--grip-orange);
+}
+
+.grip-report__advice-card--purple {
+  border-top-color: var(--grip-purple);
+}
+
+.grip-report__advice-card--purple .grip-report__advice-heading > svg,
+.grip-report__advice-card--purple li svg {
+  color: var(--grip-purple);
+}
+
+.grip-report__footer {
+  margin-top: 48px;
+  border-top: 1px solid #dde1d9;
+  padding: 32px;
+  color: var(--grip-muted);
+  font-size: 12px;
+  line-height: 20px;
+  text-align: center;
+}
+
+.grip-report__footer p {
+  max-width: 680px;
+  margin: 0 auto;
+}
+
+.grip-report__footer p:first-child {
+  margin-bottom: 8px;
+  color: var(--grip-text);
+  font-size: 14px;
+}
+
+.grip-report__footer p:nth-child(2) {
+  margin-bottom: 16px;
+}
+
+/*
+ * 专业数据分析区。
+ *
+ * 原本是写死的「两列 × 右列两行等高」。但这三张卡都会按数据缺失各自
+ * 返回 null（三次对比要 trials、CV 要 details.cv、六区域要 fingers），
+ * 于是空行仍占着 1fr，在页面上表现为六区域力量卡下方一大块空白
+ * —— 正是 AI 健康总结上面那段留白的来源。
+ *
+ * 改成 auto 行高 + auto-fit 列：有几张卡就占几格，空的自然塌陷。
+ */
+.grip-report__professional-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr));
+  align-items: start;
+  gap: 24px;
+}
+
+.grip-report__professional-side {
+  display: grid;
+  min-width: 0;
+  /* 关键：auto 而不是 1fr —— 组件返回 null 时这一行高度归零 */
+  grid-template-rows: auto;
+  grid-auto-rows: auto;
+  align-content: start;
+  gap: 24px;
+}
+
+/* 右列一张卡都没有时，连 gap 都不该留 */
+.grip-report__professional-side:empty {
+  display: none;
+}
+
+.grip-report__analysis-card {
+  min-width: 0;
+  overflow: hidden;
+  border-radius: 24px;
+  background: var(--grip-panel);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03);
+  padding: 24px;
+}
+
+.grip-report__analysis-card h3 {
+  margin: 0 0 16px;
+  font-size: 18px;
+  line-height: 28px;
+  font-weight: 700;
+}
+
+.grip-report__comparison-chart {
+  display: block;
+  width: 100%;
+  height: 180px;
+  border-bottom: 1px solid var(--grip-surface);
+}
+
+.grip-report__comparison-baseline {
+  stroke: var(--grip-line);
+  stroke-width: 1;
+}
+
+.grip-report__comparison-bar--left {
+  fill: var(--grip-blue);
+  fill-opacity: 0.75;
+}
+
+.grip-report__comparison-bar--right {
+  fill: var(--grip-orange);
+  fill-opacity: 0.75;
+}
+
+.grip-report__comparison-value {
+  fill: var(--grip-ink);
+  font-size: 11px;
+  font-weight: 700;
+  text-anchor: middle;
+}
+
+.grip-report__comparison-label,
+.grip-report__comparison-legend-label {
+  fill: var(--grip-muted);
+  font-size: 11px;
+  text-anchor: middle;
+}
+
+.grip-report__comparison-legend {
+  display: flex;
+  justify-content: center;
+  gap: 24px;
+  margin: 12px 0 16px;
+  color: var(--grip-text);
+  font-size: 13px;
+}
+
+.grip-report__comparison-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.grip-report__comparison-legend i {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--grip-blue);
+}
+
+.grip-report__comparison-legend span + span i {
+  background: var(--grip-orange);
+}
+
+.grip-report__trials-card table {
+  width: 100%;
+  border-collapse: collapse;
+  color: var(--grip-ink);
+  font-size: 13px;
+  text-align: left;
+}
+
+.grip-report__trials-card th {
+  background: var(--grip-surface);
+  padding: 10px 12px;
+  color: var(--grip-text);
+  font-weight: 500;
+}
+
+.grip-report__trials-card th:first-child {
+  border-radius: 8px 0 0 8px;
+}
+
+.grip-report__trials-card th:last-child {
+  border-radius: 0 8px 8px 0;
+}
+
+.grip-report__trials-card td {
+  border-bottom: 1px solid var(--grip-surface);
+  padding: 12px;
+  font-weight: 500;
+}
+
+.grip-report__trials-card td:first-child {
+  color: var(--grip-muted);
+  font-weight: 400;
+}
+
+.grip-report__trials-card td:last-child {
+  font-weight: 700;
+}
+
+.grip-report__trials-card tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.grip-report__cv-card {
+  display: flex;
+  min-height: 225px;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.grip-report__cv-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  gap: 24px;
+}
+
+.grip-report__cv-ring {
+  position: relative;
+  display: grid;
+  width: 140px;
+  height: 140px;
+  flex: 0 0 140px;
+  place-items: center;
+}
+
+.grip-report__cv-ring svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+}
+
+.grip-report__cv-ring-track,
+.grip-report__cv-ring-value {
+  fill: none;
+  stroke-width: 3;
+}
+
+.grip-report__cv-ring-track {
+  stroke: var(--grip-surface);
+}
+
+.grip-report__cv-ring-value {
+  stroke: var(--grip-green);
+  stroke-dasharray: 92 100;
+  stroke-linecap: round;
+}
+
+.grip-report__cv-ring > div {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  justify-items: center;
+}
+
+.grip-report__cv-ring strong {
+  font-size: 30px;
+  line-height: 38px;
+}
+
+.grip-report__cv-ring span {
+  margin-top: 4px;
+  color: var(--grip-muted);
+  font-size: 12px;
+}
+
+.grip-report__cv-copy {
+  display: grid;
+  gap: 12px;
+  max-width: 165px;
+}
+
+.grip-report__cv-copy p {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  border-radius: 12px;
+  background: var(--grip-green-soft);
+  padding: 12px 16px;
+}
+
+.grip-report__cv-copy p span,
+.grip-report__cv-copy small {
+  color: var(--grip-muted);
+  font-size: 13px;
+  line-height: 20px;
+}
+
+.grip-report__cv-copy p strong {
+  color: var(--grip-green);
+  font-size: 18px;
+  line-height: 24px;
+}
+
+.grip-report__cv-copy small {
+  display: block;
+}
+
+.grip-report__trend-card,
+.grip-report__six-region-card {
+  min-height: 225px;
+}
+
+.grip-report__six-region-header {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+.grip-report__analysis-card .grip-report__six-region-header h3 {
+  margin: 0;
+}
+
+.grip-report__six-region-legend,
+.grip-report__six-region-legend span {
+  display: flex;
+  align-items: center;
+}
+
+.grip-report__six-region-legend {
+  flex: 0 0 auto;
+  gap: 16px;
+  color: var(--grip-muted);
+  font-size: 10px;
+  line-height: 16px;
+}
+
+.grip-report__six-region-legend span {
+  gap: 6px;
+}
+
+.grip-report__six-region-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.grip-report__six-region-dot--left {
+  background: var(--grip-blue);
+}
+
+.grip-report__six-region-dot--right {
+  background: var(--grip-orange);
+}
+
+.grip-report__six-region-chart {
+  display: flex;
+  height: 120px;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.grip-report__six-region-row {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: 48px minmax(0, 1fr) 56px minmax(0, 1fr) 48px;
+  align-items: center;
+  gap: 8px;
+}
+
+.grip-report__six-region-value,
+.grip-report__six-region-name {
+  font-size: 10px;
+  line-height: 14px;
+  white-space: nowrap;
+}
+
+.grip-report__six-region-value {
+  font-weight: 600;
+}
+
+.grip-report__six-region-value--left {
+  color: var(--grip-blue);
+  text-align: right;
+}
+
+.grip-report__six-region-value--right {
+  color: var(--grip-orange);
+}
+
+.grip-report__six-region-name {
+  color: var(--grip-muted);
+  text-align: center;
+}
+
+.grip-report__six-region-track {
+  display: flex;
+  height: 10px;
+  overflow: hidden;
+}
+
+.grip-report__six-region-track--left {
+  justify-content: flex-end;
+  border-radius: 999px 0 0 999px;
+  background: rgba(125, 168, 216, 0.12);
+}
+
+.grip-report__six-region-track--right {
+  border-radius: 0 999px 999px 0;
+  background: rgba(248, 163, 109, 0.12);
+}
+
+.grip-report__six-region-track i {
+  display: block;
+  height: 100%;
+}
+
+.grip-report__six-region-track--left i {
+  border-radius: 999px 0 0 999px;
+  background: var(--grip-blue);
+}
+
+.grip-report__six-region-track--right i {
+  border-radius: 0 999px 999px 0;
+  background: var(--grip-orange);
+}
+
+.grip-report__six-region-empty {
+  display: grid;
+  height: 120px;
+  place-items: center;
+  margin: 0;
+  color: var(--grip-muted);
+  font-size: 13px;
+}
+
+.grip-report__trend-chart {
+  display: block;
+  width: 100%;
+  height: 144px;
+  margin-top: 16px;
+  overflow: visible;
+}
+
+.grip-report__trend-line {
+  fill: none;
+  stroke: var(--grip-green);
+  stroke-width: 2;
+}
+
+.grip-report__trend-point {
+  fill: var(--grip-green);
+}
+
+.grip-report__trend-label {
+  fill: var(--grip-muted);
+  font-size: 7px;
+  text-anchor: middle;
+}
+
+.grip-report--state {
+  display: grid;
+  min-height: 720px;
+  place-items: center;
+}
+
+.grip-report--state > [role="status"] {
+  color: var(--grip-text);
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.grip-report__page-state {
+  display: flex;
+  max-width: 520px;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  border: 1px solid var(--grip-line);
+  border-radius: 12px;
+  background: var(--grip-panel);
+  padding: 42px;
+  text-align: center;
+}
+
+.grip-report__page-state h1,
+.grip-report__page-state p {
+  margin: 0;
+}
+
+.grip-report__page-state a,
+.grip-report__page-state button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--grip-green);
+  padding: 12px 20px;
+  color: #fff;
+  text-decoration: none;
+}
+
+/* ════════════════════════════════════════════════
+   评分明细卡（toB 侧独有指标，补进 toC）
+   —— 变量全部沿用本文件顶部的 --grip-* 设计语言，
+      不引入新色板，保证与其余卡片视觉一致。
+   ════════════════════════════════════════════════ */
+
+.grip-report__breakdown-card {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.grip-report__breakdown-total {
+  border-radius: 16px;
+  background: var(--grip-surface);
+  padding: 16px 20px;
+}
+
+.grip-report__breakdown-total-main {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.grip-report__breakdown-total-main strong {
+  color: var(--grip-green);
+  font-size: 32px;
+  line-height: 36px;
+  font-weight: 700;
+}
+
+.grip-report__breakdown-total-main span {
+  color: var(--grip-muted);
+  font-size: 13px;
+}
+
+.grip-report__breakdown-total-split,
+.grip-report__breakdown-total-ratio {
+  margin: 6px 0 0;
+  color: var(--grip-muted);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.grip-report__breakdown-total-ratio strong {
+  color: var(--grip-ink);
+  font-weight: 600;
+}
+
+.grip-report__breakdown-group-title {
+  margin: 0 0 10px;
+  color: var(--grip-ink);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.grip-report__breakdown-group ul {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.grip-report__breakdown-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.grip-report__breakdown-label {
+  color: var(--grip-ink);
+  font-size: 13px;
+  /* help 文案挂在 title 属性上，给个下划线提示可悬停 */
+  text-decoration: underline dotted var(--grip-line);
+  text-underline-offset: 3px;
+}
+
+.grip-report__breakdown-score {
+  color: var(--grip-muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.grip-report__breakdown-score strong {
+  color: var(--grip-ink);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.grip-report__breakdown-track {
+  overflow: hidden;
+  margin-top: 6px;
+  border-radius: 999px;
+  background: var(--grip-line);
+  height: 6px;
+}
+
+.grip-report__breakdown-track i {
+  display: block;
+  border-radius: 999px;
+  background: var(--grip-green);
+  height: 100%;
+}
+
+.grip-report__breakdown-group small {
+  display: block;
+  margin-top: 6px;
+  color: var(--grip-muted);
+  font-size: 11px;
+  line-height: 16px;
+}
+
+.grip-report__breakdown-flags {
+  border-radius: 16px;
+  background: #fff7f2;
+  padding: 14px 16px;
+}
+
+.grip-report__breakdown-flags-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 8px;
+  color: #b4571f;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.grip-report__breakdown-flags-title svg {
+  width: 15px;
+  height: 15px;
+}
+
+.grip-report__breakdown-flags ul {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.grip-report__breakdown-flags li {
+  color: #8a4a1c;
+  font-size: 12px;
+  line-height: 19px;
+}

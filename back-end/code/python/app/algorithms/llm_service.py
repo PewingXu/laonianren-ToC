@@ -223,14 +223,82 @@ async def call_assessment_ai_report(
     assessment_data: dict,
     llm_overrides: dict | None = None,
 ) -> dict:
-    client, config = _get_client_and_config(llm_overrides=llm_overrides)
-    messages = _build_messages(assessment_type, patient_info, assessment_data)
+    # NOTE: logs are in ASCII/English on purpose — the Windows console runs on a GBK
+    # code page and would render Chinese log text as mojibake.
+    import time
+    t0 = time.time()
+    tag = f"[AI:{assessment_type}]"
+    print(f"\n{tag} ===== START =====", flush=True)
+
+    try:
+        client, config = _get_client_and_config(llm_overrides=llm_overrides)
+    except Exception as e:
+        print(f"{tag} [FAIL] create client: {type(e).__name__}: {e}", flush=True)
+        raise
+
+    key = str(config.get("api_key") or "")
+    masked = (key[:4] + "***" + key[-4:]) if len(key) > 8 else ("(EMPTY)" if not key else "***")
+    src = "frontend" if (llm_overrides or {}).get("api_key") else "settings-file/env"
+    print(f"{tag} config: base_url={config.get('base_url')} model={config.get('model')} "
+          f"max_tokens={config.get('max_tokens')} timeout={config.get('timeout')}", flush=True)
+    print(f"{tag} api_key={masked} (from: {src})", flush=True)
+    if not key:
+        print(f"{tag} [WARN] api_key is EMPTY -> request will fail with 401. "
+              f"Set it on the login page or in llm_settings.json", flush=True)
+
+    try:
+        messages = _build_messages(assessment_type, patient_info, assessment_data)
+    except Exception as e:
+        print(f"{tag} [FAIL] build prompt: {type(e).__name__}: {e}", flush=True)
+        raise
+    sys_len = len(messages[0]["content"])
+    usr_len = len(messages[1]["content"])
+    print(f"{tag} prompt: system={sys_len} chars, user={usr_len} chars "
+          f"(~{(sys_len + usr_len) // 2} tokens est.)", flush=True)
+
     request_kwargs = _build_request_kwargs(config=config, messages=messages, stream=False)
+    print(f"{tag} --> calling LLM, please wait "
+          f"(no response usually means: no network / wrong base_url / unknown model)", flush=True)
 
     # OpenAI Python SDK here is sync; offload to thread to avoid blocking FastAPI event loop.
-    response = await asyncio.to_thread(_create_completion_with_fallback, client, request_kwargs)
+    try:
+        response = await asyncio.to_thread(_create_completion_with_fallback, client, request_kwargs)
+    except Exception as e:
+        print(f"{tag} [FAIL] request failed after {time.time() - t0:.1f}s: {type(e).__name__}: {e}", flush=True)
+        raise
+    print(f"{tag} <-- response received in {time.time() - t0:.1f}s", flush=True)
+
+    try:
+        usage = getattr(response, "usage", None)
+        if usage:
+            print(f"{tag} tokens: in={getattr(usage, 'prompt_tokens', '?')} "
+                  f"out={getattr(usage, 'completion_tokens', '?')} "
+                  f"total={getattr(usage, 'total_tokens', '?')}", flush=True)
+        finish = getattr(response.choices[0], "finish_reason", None)
+        if finish and finish != "stop":
+            print(f"{tag} [WARN] finish_reason={finish} "
+                  f"('length' means truncated by max_tokens -> JSON will be incomplete)", flush=True)
+    except Exception:
+        pass
+
     content = response.choices[0].message.content
-    return _sanitize_ai_report(_parse_json_response(content))
+    print(f"{tag} content length: {len(content or '')} chars", flush=True)
+    if not content:
+        print(f"{tag} [WARN] model returned empty content", flush=True)
+
+    try:
+        parsed = _parse_json_response(content)
+    except Exception as e:
+        print(f"{tag} [FAIL] JSON parse: {type(e).__name__}: {e}", flush=True)
+        # 只打印结构片段（去掉中文正文，避免控制台乱码刷屏）
+        tail = (content or "")[-200:]
+        ascii_tail = tail.encode("ascii", "replace").decode("ascii")
+        print(f"{tag} raw tail (non-ascii replaced): ...{ascii_tail}", flush=True)
+        raise
+
+    result = _sanitize_ai_report(parsed)
+    print(f"{tag} [OK] done in {time.time() - t0:.1f}s, fields={list(result.keys())}\n", flush=True)
+    return result
 
 
 def stream_assessment_ai_report(

@@ -1,0 +1,1479 @@
+body:has(.gait-report) {
+  margin: 0;
+  color: #191d18;
+  background: #faf9f6;
+}
+
+.gait-report,
+.gait-report * {
+  box-sizing: border-box;
+}
+
+.gait-report {
+  --gait-ink: #191d18;
+  --gait-text: #41493f;
+  --gait-muted: #8c8c8c;
+  --gait-line: #e0e4dc;
+  --gait-panel: #fff;
+  --gait-surface: #f8faf3;
+  --gait-surface-low: #f2f5ed;
+  --gait-surface-high: #e6e9e2;
+  --gait-green: #286834;
+  --gait-green-soft: #dff2df;
+  width: 1440px;
+  min-height: 1200px;
+  margin: 0 auto;
+  color: var(--gait-ink);
+  background: #faf9f6;
+  font-family: "Be Vietnam Pro", "Microsoft YaHei", "PingFang SC", sans-serif;
+  font-size: 16px;
+  letter-spacing: 0;
+  zoom: 0.8333333333;
+}
+
+.gait-report button,
+.gait-report a {
+  color: inherit;
+  font: inherit;
+}
+
+.gait-report button {
+  cursor: pointer;
+}
+
+.gait-report button:focus-visible,
+.gait-report a:focus-visible {
+  outline: 3px solid rgba(77, 141, 84, 0.3);
+  outline-offset: 3px;
+}
+
+.gait-report svg {
+  display: block;
+}
+
+.gait-report__header {
+  display: flex;
+  width: 100%;
+  height: 84px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 38.4px;
+}
+
+.gait-report__header-leading,
+.gait-report__header-actions {
+  display: flex;
+  align-items: center;
+}
+
+.gait-report__header-leading {
+  gap: 19.2px;
+}
+
+.gait-report__header-actions {
+  gap: 14.4px;
+}
+
+.gait-report__icon-button {
+  display: grid;
+  width: 48px;
+  height: 48px;
+  place-items: center;
+  border: 1.2px solid var(--gait-surface-high);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 7.2px 21.6px rgba(42, 53, 44, 0.06);
+  padding: 0;
+  text-decoration: none;
+}
+
+.gait-report__icon-button svg {
+  width: 25.2px;
+  height: 25.2px;
+  stroke-width: 2;
+}
+
+.gait-report__title-group h1 {
+  margin: 0;
+  font-size: 28.8px;
+  line-height: 38.4px;
+  font-weight: 900;
+}
+
+.gait-report__title-group p {
+  margin: 2.4px 0 0;
+  color: var(--gait-muted);
+  font-size: 16.8px;
+  line-height: 24px;
+}
+
+.gait-report__share-button {
+  display: inline-flex;
+  height: 50.4px;
+  min-width: 150px;
+  align-items: center;
+  justify-content: center;
+  gap: 10.8px;
+  border: 1.2px solid var(--gait-surface-high);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 7.2px 21.6px rgba(42, 53, 44, 0.055);
+  font-size: 14.4px;
+  font-weight: 800;
+}
+
+.gait-report__share-button svg {
+  width: 22.8px;
+  height: 22.8px;
+}
+
+.gait-report__calendar-button {
+  width: 52.8px;
+  height: 52.8px;
+}
+
+.gait-report__content {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  gap: 38.4px;
+  padding: 0 38.4px 96px;
+}
+
+.gait-report__hero {
+  display: grid;
+  min-height: 615.2px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: center;
+  gap: 0;
+  overflow: hidden;
+  border-radius: 38.4px;
+  background: var(--gait-panel);
+  box-shadow: 0 14px 38px rgba(45, 61, 47, 0.075);
+  padding: 0;
+}
+
+.gait-report__hero-copy {
+  display: flex;
+  min-width: 0;
+  align-self: stretch;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 28.8px;
+  padding: 57.6px 19.2px 57.6px 57.6px;
+}
+
+.gait-report__hero-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 9.6px;
+  border-radius: 999px;
+  background: var(--gait-surface-low);
+  padding: 9.6px 19.2px;
+  font-size: 16.8px;
+  line-height: 24px;
+  font-weight: 500;
+}
+
+.gait-report__hero-eyebrow svg {
+  width: 24px;
+  height: 24px;
+  color: var(--gait-green);
+}
+
+.gait-report__hero h2 {
+  margin: 0;
+  font-size: 67.2px;
+  line-height: 86.4px;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.gait-report__hero h2 strong {
+  color: var(--gait-green);
+}
+
+.gait-report__hero-lead {
+  max-width: 560px;
+  margin: 0;
+  color: var(--gait-text);
+  font-size: 16.8px;
+  line-height: 26.4px;
+}
+
+.gait-report__hero-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14.4px;
+  margin-top: 19.2px;
+}
+
+.gait-report__hero-tags article {
+  display: flex;
+  align-items: center;
+  gap: 9.6px;
+  border: 1.2px solid var(--gait-surface-high);
+  border-radius: 14.4px;
+  background: var(--gait-surface);
+  padding: 14.4px 19.2px;
+  font-size: 24px;
+  line-height: 33.6px;
+  font-weight: 500;
+}
+
+.gait-report__hero-tags svg {
+  width: 28px;
+  height: 28px;
+  color: #4d8d54;
+}
+
+.gait-report__hero-media {
+  position: relative;
+  align-self: stretch;
+  width: 100%;
+  height: auto;
+  min-height: 615.2px;
+  margin: 0;
+}
+
+.gait-report__hero-media > img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 0;
+  object-fit: cover;
+  box-shadow: none;
+}
+
+.gait-report__score-card {
+  position: absolute;
+  top: 50%;
+  right: 57.6px;
+  display: flex;
+  min-width: 220px;
+  flex-direction: column;
+  align-items: center;
+  gap: 9.6px;
+  transform: translateY(-50%) rotate(-2deg);
+  border: 1.2px solid var(--gait-surface-high);
+  border-radius: 28.8px;
+  background: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 14px 38px rgba(45, 61, 47, 0.12);
+  padding: 28.8px;
+  color: var(--gait-text);
+  font-size: 16.8px;
+  font-weight: 500;
+}
+
+.gait-report__score-card p {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  margin: 0;
+}
+
+.gait-report__score-value {
+  color: var(--gait-green);
+  font-size: 67.2px;
+  line-height: 72px;
+}
+
+.gait-report__score-card small {
+  font-size: 16.8px;
+  font-weight: 500;
+}
+
+.gait-report__score-card em {
+  border-radius: 999px;
+  background: var(--gait-green-soft);
+  padding: 4.8px 14.4px;
+  color: #0e5220;
+  font-size: 16.8px;
+  font-style: normal;
+  font-weight: 700;
+}
+
+.gait-report__summary-grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 28.8px;
+}
+
+.gait-report__summary-card,
+.gait-report__explanation-card {
+  position: relative;
+  min-height: 286px;
+  overflow: hidden;
+  border-radius: 28.8px;
+  box-shadow: 0 14px 38px rgba(45, 61, 47, 0.075);
+  padding: 38.4px;
+}
+
+.gait-report__summary-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  background: var(--gait-panel);
+}
+
+.gait-report__explanation-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  background: var(--gait-surface-high);
+}
+
+.gait-report__summary-grid h3 {
+  position: relative;
+  z-index: 1;
+  margin: 0 0 19.2px;
+  font-size: 24px;
+  line-height: 33.6px;
+  font-weight: 600;
+}
+
+.gait-report__summary-grid article > p {
+  position: relative;
+  z-index: 1;
+  margin: 0 0 28.8px;
+  color: var(--gait-text);
+  font-size: 16.8px;
+  line-height: 26.4px;
+}
+
+.gait-report__summary-facts {
+  display: flex;
+  align-items: center;
+  gap: 28.8px;
+}
+
+.gait-report__summary-facts > div {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.gait-report__summary-facts span {
+  color: var(--gait-text);
+  font-size: 16.8px;
+}
+
+.gait-report__summary-facts strong {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 24px;
+  line-height: 33.6px;
+  font-weight: 500;
+}
+
+.gait-report__summary-facts strong:first-of-type {
+  color: var(--gait-green);
+}
+
+.gait-report__summary-facts svg {
+  width: 20px;
+  height: 20px;
+}
+
+.gait-report__summary-facts i {
+  width: 1.2px;
+  height: 48px;
+  background: #c0c9bc;
+}
+
+.gait-report__explanation-mark {
+  position: absolute;
+  top: -40px;
+  right: -40px;
+  width: 144px;
+  height: 144px;
+  color: #c0c9bc;
+  opacity: 0.16;
+}
+
+.gait-report__explanation-card button {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  width: fit-content;
+  align-items: center;
+  gap: 9.6px;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: var(--gait-green);
+  font-size: 16.8px;
+  font-weight: 600;
+}
+
+.gait-report__explanation-card button svg {
+  width: 20px;
+  height: 20px;
+}
+
+.gait-report__abilities {
+  width: 100%;
+}
+
+.gait-report__section-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 24px;
+  font-size: 24px;
+  line-height: 33.6px;
+  font-weight: 600;
+}
+
+.gait-report__section-title svg {
+  width: 24px;
+  height: 24px;
+  color: var(--gait-green);
+}
+
+.gait-report__ability-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  align-items: stretch;
+  gap: 24px;
+}
+
+.gait-report__ability-card {
+  --gait-ability-tone: var(--gait-green);
+  --gait-ability-soft: rgba(174, 243, 176, 0.1);
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 24px;
+  border-radius: 38.4px;
+  background: var(--gait-panel);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+  padding: 24px;
+}
+
+.gait-report__ability-card--coordination {
+  --gait-ability-tone: #f8a36d;
+  --gait-ability-soft: rgba(248, 163, 109, 0.1);
+}
+
+.gait-report__ability-card--rhythm {
+  --gait-ability-tone: #a689b5;
+  --gait-ability-soft: rgba(166, 137, 181, 0.1);
+}
+
+.gait-report__ability-card--direction {
+  --gait-ability-tone: #7da8d8;
+  --gait-ability-soft: rgba(125, 168, 216, 0.1);
+}
+
+.gait-report__ability-header {
+  display: flex;
+  min-width: 0;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.gait-report__ability-header > div {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 12px;
+}
+
+.gait-report__ability-index {
+  display: grid;
+  width: 40px;
+  height: 40px;
+  flex: 0 0 40px;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--gait-ability-tone);
+  color: #fff;
+  font-size: 18px;
+  line-height: 20px;
+  font-weight: 700;
+}
+
+.gait-report__ability-header h4 {
+  margin: 0;
+  font-size: 24px;
+  line-height: 32px;
+  font-weight: 700;
+}
+
+.gait-report__ability-status {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 4px;
+  border-radius: 999px;
+  background: rgba(174, 243, 176, 0.2);
+  padding: 4px 12px;
+  color: var(--gait-green);
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.gait-report__ability-status svg {
+  width: 14px;
+  height: 14px;
+  fill: currentColor;
+  stroke: #fff;
+}
+
+.gait-report__ability-subtitle {
+  margin: -16px 0 0;
+  color: var(--gait-text);
+  font-size: 16.8px;
+  line-height: 26.4px;
+}
+
+.gait-report__ability-visual {
+  display: flex;
+  min-width: 0;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: 16px;
+}
+
+.gait-report__ability-image-wrap,
+.gait-report__ability-metrics {
+  width: calc(50% - 8px);
+  min-width: 0;
+}
+
+.gait-report__ability-image-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.gait-report__ability-image-wrap img {
+  display: block;
+  width: 100%;
+  height: 128px;
+  object-fit: contain;
+}
+
+.gait-report__ability-metrics {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.gait-report__ability-metrics p,
+.gait-report__ability-metrics strong {
+  margin: 0;
+}
+
+.gait-report__ability-metric-label {
+  color: var(--gait-text);
+  font-size: 10px;
+  line-height: 14px;
+  font-weight: 700;
+}
+
+.gait-report__ability-metric-label span {
+  font-weight: 400;
+}
+
+.gait-report__ability-measure > div,
+.gait-report__ability-load-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.gait-report__ability-measure > div > span,
+.gait-report__ability-load-row > span {
+  color: var(--gait-text);
+  font-size: 12px;
+  line-height: 16px;
+}
+
+.gait-report__ability-measure strong,
+.gait-report__ability-load-row strong,
+.gait-report__direction-measure > strong,
+.gait-report__direction-sway strong,
+.gait-report__rhythm-measure > strong {
+  font-size: 18px;
+  line-height: 24px;
+  font-weight: 700;
+}
+
+.gait-report__ability-measure strong,
+.gait-report__direction-measure > strong {
+  color: var(--gait-ability-tone);
+}
+
+.gait-report__ability-card small {
+  margin-left: 2px;
+  font-size: 10px;
+  font-weight: 400;
+}
+
+.gait-report__ability-progress {
+  position: relative;
+  height: 6px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #ecefe7;
+}
+
+.gait-report__ability-progress i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--gait-ability-tone);
+}
+
+.gait-report__ability-range {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 2px !important;
+  color: #c0c9bc;
+  font-size: 8px;
+  line-height: 10px;
+}
+
+.gait-report__ability-load-row--left strong {
+  color: #7da8d8;
+}
+
+.gait-report__ability-load-row--right strong {
+  color: #f8a36d;
+}
+
+.gait-report__load-balance {
+  position: relative;
+  padding-top: 8px;
+}
+
+.gait-report__load-balance > div {
+  display: flex;
+  height: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #ecefe7;
+}
+
+.gait-report__load-balance > div i,
+.gait-report__load-balance > div b {
+  height: 100%;
+}
+
+.gait-report__load-balance > div i {
+  background: #7da8d8;
+}
+
+.gait-report__load-balance > div b {
+  background: #f8a36d;
+}
+
+.gait-report__load-balance > span {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  display: flex;
+  transform: translateX(-50%);
+  flex-direction: column;
+  align-items: center;
+  color: #c0c9bc;
+  font-size: 8px;
+  line-height: 10px;
+}
+
+.gait-report__load-balance > span i {
+  width: 1px;
+  height: 16px;
+  background: #c0c9bc;
+}
+
+.gait-report__rhythm-measure {
+  min-width: 0;
+}
+
+.gait-report__rhythm-label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 4px;
+  color: var(--gait-text);
+  font-size: 10px;
+  line-height: 14px;
+}
+
+.gait-report__rhythm-label svg {
+  width: 12px;
+  height: 12px;
+  color: var(--gait-ability-tone);
+}
+
+.gait-report__rhythm-track {
+  height: 4px;
+  margin-top: 4px;
+  border-radius: 999px;
+  background: #ecefe7;
+}
+
+.gait-report__rhythm-track i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--gait-ability-tone);
+}
+
+.gait-report__rhythm-band--cadence {
+  width: 40%;
+  margin-left: 30%;
+}
+
+.gait-report__rhythm-band--step {
+  width: 50%;
+  margin-left: 25%;
+}
+
+.gait-report__direction-measure > strong,
+.gait-report__direction-sway strong {
+  display: block;
+  color: var(--gait-ability-tone);
+}
+
+.gait-report__direction-sway > p {
+  color: var(--gait-text);
+  font-size: 10px;
+  line-height: 14px;
+  font-weight: 700;
+}
+
+.gait-report__direction-sway > span {
+  display: block;
+  color: var(--gait-text);
+  font-size: 10px;
+  line-height: 14px;
+}
+
+.gait-report__ability-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  border-radius: 16px;
+  background: var(--gait-ability-soft);
+  padding: 16px;
+}
+
+.gait-report__ability-note svg {
+  width: 24px;
+  height: 24px;
+  flex: 0 0 auto;
+  color: var(--gait-ability-tone);
+  fill: color-mix(in srgb, var(--gait-ability-tone) 18%, transparent);
+}
+
+.gait-report__ability-note p {
+  margin: 0;
+  color: var(--gait-text);
+  font-size: 16.8px;
+  line-height: 26.4px;
+}
+
+.gait-report__guidance-grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  align-items: stretch;
+  gap: 24px;
+}
+
+.gait-report__recommendations,
+.gait-report__trend {
+  min-width: 0;
+  border-radius: 24px;
+  background: var(--gait-panel);
+  box-shadow: 0 14px 38px rgba(45, 61, 47, 0.075);
+  padding: 32px;
+}
+
+.gait-report__guidance-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 24px;
+  line-height: 33.6px;
+  font-weight: 600;
+}
+
+.gait-report__guidance-title svg {
+  width: 24px;
+  height: 24px;
+  flex: 0 0 auto;
+}
+
+.gait-report__recommendations-title {
+  margin-bottom: 24px;
+}
+
+.gait-report__recommendations-title svg {
+  color: #f8a36d;
+}
+
+.gait-report__recommendation-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.gait-report__recommendation-item {
+  --gait-recommendation-tone: var(--gait-green);
+  --gait-recommendation-soft: rgba(174, 243, 176, 0.4);
+  display: flex;
+  min-width: 0;
+  min-height: 80px;
+  align-items: center;
+  gap: 16px;
+  border: 1px solid transparent;
+  border-radius: 16px;
+  background: var(--gait-surface);
+  padding: 16px;
+}
+
+.gait-report__recommendation-item--orange {
+  --gait-recommendation-tone: #f8a36d;
+  --gait-recommendation-soft: rgba(248, 163, 109, 0.2);
+}
+
+.gait-report__recommendation-item--blue {
+  --gait-recommendation-tone: #7da8d8;
+  --gait-recommendation-soft: rgba(125, 168, 216, 0.2);
+}
+
+.gait-report__recommendation-icon {
+  display: grid;
+  width: 48px;
+  height: 48px;
+  flex: 0 0 48px;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--gait-recommendation-soft);
+  color: var(--gait-recommendation-tone);
+}
+
+.gait-report__recommendation-icon svg {
+  width: 24px;
+  height: 24px;
+}
+
+.gait-report__recommendation-copy {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.gait-report__recommendation-copy h4,
+.gait-report__recommendation-copy p {
+  margin: 0;
+}
+
+.gait-report__recommendation-copy h4 {
+  font-size: 20px;
+  line-height: 28px;
+  font-weight: 500;
+}
+
+.gait-report__recommendation-copy p {
+  color: var(--gait-text);
+  font-size: 16.8px;
+  line-height: 26.4px;
+  font-weight: 500;
+}
+
+.gait-report__recommendation-chevron {
+  width: 24px;
+  height: 24px;
+  flex: 0 0 auto;
+  color: #c0c9bc;
+}
+
+.gait-report__trend {
+  display: flex;
+  flex-direction: column;
+}
+
+.gait-report__trend-title {
+  margin-bottom: 8px;
+}
+
+.gait-report__trend-title svg {
+  color: #4d8d54;
+}
+
+.gait-report__trend-summary {
+  margin: 0 0 24px;
+  color: var(--gait-text);
+  font-size: 16.8px;
+  line-height: 26.4px;
+  font-weight: 500;
+}
+
+.gait-report__trend-frame {
+  display: flex;
+  min-height: 160px;
+  flex: 1 1 auto;
+  flex-direction: column;
+  justify-content: flex-end;
+  margin-top: 16px;
+  border: 1px solid var(--gait-line);
+  border-radius: 16px;
+  background: var(--gait-surface);
+  padding: 16px;
+}
+
+.gait-report__trend-plot {
+  position: relative;
+  width: 100%;
+  height: 128px;
+}
+
+.gait-report__trend-chart {
+  width: 100%;
+  height: 100%;
+  color: #4d8d54;
+}
+
+.gait-report__trend-chart path {
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2;
+}
+
+.gait-report__trend-chart circle {
+  fill: currentColor;
+}
+
+.gait-report__trend-dates {
+  position: absolute;
+  bottom: -20px;
+  display: flex;
+  width: 100%;
+  justify-content: space-between;
+  padding: 0 8px;
+  color: var(--gait-text);
+  font-size: 10px;
+  line-height: 16px;
+  font-weight: 500;
+}
+
+.gait-report__trend-date--current {
+  color: var(--gait-green);
+  font-weight: 700;
+}
+
+.gait-report__trend-note {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 32px;
+  border-radius: 12px;
+  background: rgba(174, 243, 176, 0.2);
+  padding: 16px;
+  color: var(--gait-text);
+  font-size: 16.8px;
+  line-height: 26.4px;
+  font-weight: 500;
+}
+
+.gait-report__trend-note svg {
+  width: 24px;
+  height: 24px;
+  flex: 0 0 auto;
+  color: var(--gait-green);
+}
+
+.gait-report__body-interpretation {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  gap: 26.4px;
+}
+
+.gait-report__body-interpretation:focus-visible {
+  outline: 3px solid rgba(77, 141, 84, 0.3);
+  outline-offset: 3px;
+}
+
+.gait-report__interpretation-overview,
+.gait-report__health-summary {
+  border-radius: 16.8px;
+  background: var(--gait-panel);
+  box-shadow: 0 12px 32px rgba(34, 55, 40, 0.07);
+}
+
+.gait-report__interpretation-overview {
+  padding: 38.4px;
+}
+
+.gait-report__interpretation-heading h2,
+.gait-report__interpretation-heading p,
+.gait-report__interpretation-card h3,
+.gait-report__interpretation-card p,
+.gait-report__interpretation-card-copy strong,
+.gait-report__health-summary h3,
+.gait-report__health-summary h4,
+.gait-report__health-summary p,
+.gait-report__health-summary-row strong,
+.gait-report__interpretation-actions strong {
+  margin: 0;
+}
+
+.gait-report__interpretation-heading {
+  margin: 0 9.6px 36px;
+}
+
+.gait-report__interpretation-heading h2 {
+  font-size: 30px;
+  line-height: 36px;
+  font-weight: 900;
+}
+
+.gait-report__interpretation-heading p {
+  margin-top: 12px;
+  color: var(--gait-text);
+  font-size: 18px;
+  line-height: 28px;
+  font-weight: 500;
+}
+
+.gait-report__interpretation-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 24px;
+}
+
+.gait-report__interpretation-card {
+  display: flex;
+  min-width: 0;
+  min-height: 456px;
+  overflow: hidden;
+  flex-direction: column;
+  border: 1.2px solid #e6ebe7;
+  border-radius: 10.8px;
+  background: #fff;
+  box-shadow: 0 4.8px 16.8px rgba(20, 35, 26, 0.1);
+}
+
+.gait-report__interpretation-card-main {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  padding: 24px 24px 20px;
+}
+
+.gait-report__interpretation-card-heading {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 18px;
+  margin-bottom: 35px;
+}
+
+.gait-report__interpretation-bubble {
+  display: grid;
+  width: 62.4px;
+  height: 62.4px;
+  flex: 0 0 62.4px;
+  place-items: center;
+  border-radius: 50%;
+}
+
+.gait-report__interpretation-bubble svg {
+  width: 28.8px;
+  height: 28.8px;
+  stroke-width: 2;
+}
+
+.gait-report__interpretation-bubble--green {
+  color: #147b2f;
+  background: #e8f5e9;
+}
+
+.gait-report__interpretation-bubble--blue {
+  color: #347fc1;
+  background: #e4f1fb;
+}
+
+.gait-report__interpretation-bubble--orange {
+  color: #c95320;
+  background: #fae9e0;
+}
+
+.gait-report__interpretation-bubble--purple {
+  color: #6d5ab4;
+  background: #ebe3fb;
+}
+
+.gait-report__interpretation-card-heading > div {
+  min-width: 0;
+}
+
+.gait-report__interpretation-card h3 {
+  font-size: 22.8px;
+  line-height: 30px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.gait-report__interpretation-card-heading p {
+  margin-top: 7.2px;
+  color: #087a27;
+  font-size: 15.6px;
+  line-height: 22px;
+  font-weight: 800;
+}
+
+.gait-report__interpretation-card-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 25.2px;
+}
+
+.gait-report__interpretation-card-copy p {
+  color: #263029;
+  font-size: 15.6px;
+  line-height: 25.2px;
+  font-weight: 500;
+}
+
+.gait-report__interpretation-card-copy strong,
+.gait-report__interpretation-card-copy span {
+  display: block;
+}
+
+.gait-report__interpretation-card-copy strong {
+  margin-bottom: 4.8px;
+  color: var(--gait-ink);
+  font-weight: 900;
+}
+
+.gait-report__interpretation-card button {
+  display: flex;
+  width: 100%;
+  min-height: 55.2px;
+  align-items: center;
+  justify-content: center;
+  gap: 48px;
+  border: 0;
+  border-top: 1px solid #eef1ee;
+  background: #f1f6f3;
+  color: var(--gait-ink);
+  font-size: 15.6px;
+  line-height: 22px;
+  font-weight: 800;
+  transition: background 160ms ease, transform 140ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+.gait-report__interpretation-card button svg {
+  width: 16.8px;
+  height: 16.8px;
+  color: var(--gait-green);
+}
+
+.gait-report__interpretation-card button:active,
+.gait-report__interpretation-action-buttons button:active {
+  transform: scale(0.97);
+}
+
+.gait-report__health-summary {
+  position: relative;
+  overflow: hidden;
+  border: 2.4px solid #dcebe0;
+  padding: 36px 67.2px 38.4px;
+}
+
+.gait-report__health-summary-title {
+  position: relative;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: 14.4px;
+  margin-bottom: 25.2px;
+}
+
+.gait-report__health-summary-title > span,
+.gait-report__health-summary-row > span,
+.gait-report__interpretation-actions-icon {
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: #e4f3e5;
+  color: #147b2f;
+}
+
+.gait-report__health-summary-title > span {
+  width: 45.6px;
+  height: 45.6px;
+  flex: 0 0 45.6px;
+}
+
+.gait-report__health-summary-title svg {
+  width: 21.6px;
+  height: 21.6px;
+}
+
+.gait-report__health-summary-title h3 {
+  font-size: 28.8px;
+  line-height: 36px;
+  font-weight: 900;
+}
+
+.gait-report__health-summary-hero {
+  position: relative;
+  min-height: 270px;
+}
+
+.gait-report__health-summary-copy {
+  position: relative;
+  z-index: 2;
+  width: 42%;
+  padding-top: 12px;
+}
+
+.gait-report__health-summary-copy h4 {
+  color: #087622;
+  font-size: 34.8px;
+  line-height: 46.8px;
+  font-weight: 900;
+}
+
+.gait-report__health-summary-copy p {
+  margin-top: 14.4px;
+  color: #202821;
+  font-size: 18px;
+  line-height: 30px;
+  font-weight: 500;
+}
+
+.gait-report__health-summary-image {
+  position: absolute;
+  z-index: 1;
+  top: -108px;
+  right: -67.2px;
+  width: 46%;
+  height: auto;
+  aspect-ratio: 1402 / 1122;
+  overflow: hidden;
+  pointer-events: none;
+  -webkit-mask-image: linear-gradient(90deg, transparent 0%, #000 18%, #000 94%, transparent 100%), linear-gradient(180deg, #000 0%, #000 48%, rgba(0, 0, 0, 0.2) 72%, transparent 100%);
+  -webkit-mask-composite: source-in;
+  mask-image: linear-gradient(90deg, transparent 0%, #000 18%, #000 94%, transparent 100%), linear-gradient(180deg, #000 0%, #000 48%, rgba(0, 0, 0, 0.2) 72%, transparent 100%);
+  mask-composite: intersect;
+}
+
+.gait-report__health-summary-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: center;
+  filter: saturate(0.86) brightness(1.04);
+}
+
+.gait-report__health-summary-rows {
+  position: relative;
+  z-index: 3;
+  width: 100%;
+  background: linear-gradient(
+    90deg,
+    #fff 0%,
+    rgba(255, 255, 255, 0.98) 66%,
+    rgba(255, 255, 255, 0.82) 82%,
+    rgba(255, 255, 255, 0.18) 100%
+  );
+}
+
+.gait-report__health-summary-row {
+  display: grid;
+  min-height: 72px;
+  grid-template-columns: 45.6px 124.8px minmax(0, 1fr);
+  align-items: center;
+  gap: 16.8px;
+  border-top: 1px solid #edf0ed;
+}
+
+.gait-report__health-summary-row:first-child {
+  border-top: 0;
+}
+
+.gait-report__health-summary-row > span {
+  width: 42px;
+  height: 42px;
+}
+
+.gait-report__health-summary-row svg {
+  width: 21.6px;
+  height: 21.6px;
+}
+
+.gait-report__health-summary-row strong {
+  font-size: 18px;
+  line-height: 25.2px;
+  font-weight: 800;
+}
+
+.gait-report__health-summary-row p {
+  color: #5e625e;
+  font-size: 15.6px;
+  line-height: 25.2px;
+  font-weight: 500;
+}
+
+.gait-report__health-summary-row:first-child p {
+  max-width: 58%;
+}
+
+.gait-report__interpretation-actions {
+  position: relative;
+  z-index: 3;
+  display: flex;
+  min-height: 96px;
+  align-items: center;
+  gap: 19.2px;
+  margin-top: 24px;
+  border: 1px solid #d9ebdc;
+  border-radius: 20.4px;
+  background: linear-gradient(90deg, #edf8ee, #f6fbf7);
+  padding: 19.2px 31.2px 19.2px 21.6px;
+}
+
+.gait-report__interpretation-actions-icon {
+  width: 57.6px;
+  height: 57.6px;
+  flex: 0 0 57.6px;
+  background: #fff;
+}
+
+.gait-report__interpretation-actions-icon svg {
+  width: 28.8px;
+  height: 28.8px;
+}
+
+.gait-report__interpretation-actions > div:not(.gait-report__interpretation-action-buttons) {
+  min-width: 0;
+  flex: 1;
+}
+
+.gait-report__interpretation-actions strong {
+  color: #118132;
+  font-size: 20.4px;
+  line-height: 27.6px;
+  font-weight: 900;
+}
+
+.gait-report__interpretation-actions p {
+  margin-top: 4.8px;
+  color: #5d675f;
+  font-size: 14.4px;
+  line-height: 21.6px;
+  font-weight: 500;
+}
+
+.gait-report__interpretation-action-buttons {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 14.4px;
+}
+
+.gait-report__interpretation-action-buttons button {
+  display: inline-flex;
+  min-width: 177.6px;
+  height: 52.8px;
+  align-items: center;
+  justify-content: center;
+  gap: 10.8px;
+  border: 1.8px solid #16833a;
+  border-radius: 8.4px;
+  background: #087d26;
+  padding: 0 18px;
+  color: #fff;
+  font-size: 15.6px;
+  line-height: 22px;
+  font-weight: 900;
+  transition: background 160ms ease, color 160ms ease, transform 140ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+.gait-report__interpretation-action-buttons button.is-secondary {
+  background: #fff;
+  color: var(--gait-ink);
+}
+
+.gait-report__interpretation-action-buttons button svg {
+  width: 18px;
+  height: 18px;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .gait-report__interpretation-card button:hover {
+    background: #e7f1e9;
+  }
+
+  .gait-report__interpretation-action-buttons button:hover {
+    background: #106f2b;
+  }
+
+  .gait-report__interpretation-action-buttons button.is-secondary:hover {
+    background: #edf8ee;
+  }
+}
+
+.gait-report--state {
+  display: grid;
+  width: 1200px;
+  min-height: 720px;
+  place-items: center;
+  zoom: 1;
+}
+
+.gait-report--state > [role="status"] {
+  color: var(--gait-text);
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.gait-report__page-state {
+  display: flex;
+  max-width: 520px;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  border: 1px solid var(--gait-line);
+  border-radius: 12px;
+  background: var(--gait-panel);
+  padding: 42px;
+  text-align: center;
+}
+
+.gait-report__page-state h1,
+.gait-report__page-state p {
+  margin: 0;
+}
+
+.gait-report__page-state a,
+.gait-report__page-state button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--gait-green);
+  padding: 12px 20px;
+  color: #fff;
+  text-decoration: none;
+}

@@ -19,5 +19,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('update-status', handler)
     // 返回取消监听函数
     return () => ipcRenderer.removeListener('update-status', handler)
-  }
+  },
+
+  // ====== 报告 PDF 导出（Chromium 原生打印）======
+  // 主进程调 webContents.printToPDF 出矢量 PDF（文字可选可搜、字体内嵌），
+  // 再用系统保存对话框让用户选存哪。不走 html2canvas 位图截图。
+  // 前端在 lib/reportPdf.jsx 里调用；渲染进程只负责标记打印范围和算缩放比。
+  // 返回 { ok, filePath } / { ok:false, canceled:true } / { ok:false, error }
+  printReportToPdf: (options) => ipcRenderer.invoke('report:print-to-pdf', options)
 });

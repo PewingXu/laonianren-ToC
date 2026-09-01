@@ -1,0 +1,568 @@
+/*
+ * 原交付包这里是全局 * 和 body。嵌入后 * 会清掉现有页面的字距、body 会覆盖
+ * 现有配色与字体，故一并收敛到 .health-overview 作用域内。
+ * 下面的 .health-overview 规则本身已设置 color/background/font-family，
+ * 原 body 规则对总览页是冗余的。
+ */
+.health-overview * {
+  letter-spacing: 0;
+}
+
+.health-overview {
+  --content-width: 1440px;
+  --page-padding: 38.4px;
+  --section-gap: 32px;
+  min-height: 120vh;
+  zoom: 0.8333333333;
+  color: #191d18;
+  background: linear-gradient(135deg, #fff9f5 0%, #f8faf3 100%);
+  font-family: "Be Vietnam Pro", "Microsoft YaHei", "PingFang SC", sans-serif;
+}
+
+.health-overview__scroll {
+  height: 120vh;
+  scrollbar-gutter: auto;
+}
+
+.health-overview__content {
+  width: min(100%, 1440px);
+  padding: 24px 38.4px 80px;
+}
+
+.material-symbols-outlined {
+  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+  font-style: normal;
+  line-height: 1;
+  letter-spacing: 0;
+}
+
+.soft-shadow {
+  box-shadow: 0 10px 40px -10px rgb(0 0 0 / 4%);
+}
+
+.type-page-title {
+  font-size: 28.8px !important;
+  line-height: 38.4px !important;
+}
+
+.type-body {
+  font-size: 16.8px !important;
+  line-height: 26.4px !important;
+}
+
+.overview-clamp-2,
+.overview-clamp-3 {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+}
+
+.overview-clamp-2 {
+  -webkit-line-clamp: 2;
+}
+
+.overview-clamp-3 {
+  -webkit-line-clamp: 3;
+}
+
+.health-overview__report-header {
+  width: 100%;
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: 32px 38.4px;
+  gap: 24px;
+}
+
+.health-overview__report-header h1 {
+  margin: 0;
+  color: #191d18;
+  font-size: 28.8px;
+  line-height: 38.4px;
+  overflow-wrap: normal;
+}
+
+.health-overview__recorded-at {
+  margin: 8px 0 0;
+  color: #5f5e5b;
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.health-overview__share-button {
+  min-width: 0;
+  min-height: 0;
+  padding: 12px 24px;
+  border: 1px solid rgb(77 141 84 / 20%);
+  border-radius: 9999px;
+  color: #4d8d54;
+  background: rgb(255 255 255 / 60%);
+  font-size: 20px;
+  font-weight: 500;
+  line-height: 28px;
+}
+
+.health-overview__share-button:focus-visible {
+  outline: 3px solid rgb(77 141 84 / 38%);
+  outline-offset: 3px;
+}
+
+.health-overview__hero {
+  display: flex;
+  grid-template-columns: none;
+  min-height: 360px;
+  margin-bottom: 32px;
+  border: 0;
+  border-radius: 40px;
+  background: #fff;
+  box-shadow: 0 10px 40px -10px rgb(0 0 0 / 4%);
+}
+
+.health-overview__hero-copy {
+  min-width: 0;
+  padding: 48px;
+}
+
+.health-overview__hero h2 {
+  max-width: none;
+  margin: 0 0 24px;
+  color: #4d8d54;
+  font-size: 56px;
+  line-height: 1.25;
+  overflow-wrap: normal;
+}
+
+.health-overview__hero h2.health-overview__hero-title--compact {
+  font-size: 44px;
+  line-height: 56px;
+}
+
+.health-overview__hero-description {
+  max-width: 448px;
+  margin: 0 0 32px;
+  color: #5f5e5b;
+  font-size: 20px;
+  line-height: 28px;
+}
+
+.health-overview__hero-status {
+  color: #f8a36d;
+}
+
+.health-overview__hero-kicker {
+  width: fit-content;
+  margin-bottom: 16px;
+  padding: 6px 10px;
+  border-radius: 12px;
+  color: #9a5c19;
+  background: #fff6e9;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.health-overview__hero-media {
+  min-width: 0;
+  min-height: 360px;
+  overflow: hidden;
+  background: #e8eee7;
+}
+
+.health-overview__hero-media img {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.health-overview__hero-media .health-overview__image-fallback {
+  position: absolute;
+  inset: 0;
+}
+
+#abilities .health-overview__section-heading {
+  margin-bottom: 32px;
+}
+
+#abilities .health-overview__section-heading h2 {
+  margin-bottom: 8px;
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 33.6px;
+}
+
+#abilities .health-overview__section-heading p {
+  margin: 0;
+  font-size: 16.8px;
+  line-height: 26.4px;
+}
+
+.health-overview__ability-grid {
+  gap: 24px;
+}
+
+@media (min-width: 768px) {
+  .health-overview__ability-grid {
+    grid-auto-rows: 1fr;
+  }
+}
+
+.health-overview__ability-card {
+  min-height: 516px;
+  padding: 24px;
+  border: 1px solid rgb(192 201 188 / 20%);
+  border-radius: 32px;
+  background: #fff;
+  box-shadow: 0 10px 40px -10px rgb(0 0 0 / 4%);
+  transition: none;
+}
+
+.health-overview__ability-card:active,
+.health-overview__ability-card[data-available='true']:hover {
+  border-color: rgb(192 201 188 / 20%);
+  transform: none;
+}
+
+.health-overview__ability-header {
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.health-overview__ability-heading {
+  gap: 12px;
+}
+
+.health-overview__ability-index {
+  flex-basis: 32px;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  font-size: 18px;
+}
+
+.health-overview__ability-heading h3 {
+  font-size: 30px;
+  line-height: 36px;
+  overflow-wrap: normal;
+}
+
+.health-overview__ability-card[data-ability='standing'] .health-overview__ability-heading h3 {
+  font-size: 24px;
+  line-height: 32px;
+}
+
+.health-overview__ability-heading p {
+  margin-top: 0;
+  font-size: 16px;
+  line-height: 24px;
+}
+
+.health-overview__ability-card[data-ability='standing'] .health-overview__ability-heading p,
+.health-overview__ability-card[data-ability='grip'] .health-overview__ability-heading p {
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.health-overview__status-badge {
+  min-height: 0;
+  padding: 4px 12px;
+  gap: 4px;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 20px;
+}
+
+.health-overview__ability-card[data-ability='gait'] .health-overview__status-badge {
+  font-size: 16px;
+  line-height: 24px;
+}
+
+.health-overview__metrics {
+  margin-bottom: 16px;
+}
+
+.health-overview__metrics--three {
+  gap: 8px;
+}
+
+.health-overview__metrics--four {
+  gap: 4px;
+}
+
+.health-overview__metric,
+.health-overview__metric[data-compact] {
+  padding: 24px;
+  border-radius: 12px;
+  background: #f8faf3;
+}
+
+.health-overview__metric[data-compact] {
+  background: transparent;
+}
+
+.health-overview__metric-label {
+  gap: 4px;
+  font-size: 16px;
+  line-height: 24px;
+}
+
+.health-overview__metric-label .material-symbols-outlined {
+  flex: 0 0 auto;
+  color: var(--ability-color);
+}
+
+.health-overview__metric-value {
+  gap: 2px;
+  margin: 0;
+}
+
+.health-overview__metric-value strong {
+  font-size: 36px;
+  line-height: 40px;
+}
+
+.health-overview__metrics--three .health-overview__metric:nth-child(3) .health-overview__metric-value strong {
+  color: #4d8d54;
+  font-size: 48px;
+  line-height: 48px;
+}
+
+.health-overview__metric-value span,
+.health-overview__metric small {
+  font-size: 12px;
+  line-height: 16px;
+}
+
+.health-overview__ability-card[data-ability='gait'] .health-overview__metric-label {
+  gap: 4.8px;
+  margin-bottom: 4.8px;
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 24px;
+}
+
+.health-overview__ability-card[data-ability='gait'] .health-overview__metric-label .material-symbols-outlined {
+  font-size: 28.8px;
+}
+
+.health-overview__ability-card[data-ability='gait'] .health-overview__metric-value strong {
+  font-size: 43.2px;
+  line-height: 48px;
+}
+
+.health-overview__ability-card[data-ability='gait'] .health-overview__metric-value span {
+  flex-shrink: 0;
+  font-size: 16.8px;
+  line-height: 24px;
+  white-space: nowrap;
+}
+
+.health-overview__ability-card[data-ability='gait'] .health-overview__metric small {
+  margin-top: 2.4px;
+  font-size: 14.4px;
+  line-height: 19.2px;
+}
+
+.health-overview__ability-insight {
+  gap: 8px;
+  width: 100%;
+  height: 64px;
+  min-height: 64px;
+  margin: 0;
+  padding: 12px;
+  border-radius: 12px;
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 24px;
+}
+
+.health-overview__ability-card[data-ability='sitstand'] .health-overview__ability-insight {
+  color: #4d8d54;
+  background: #eaf3ea;
+}
+
+.health-overview__ability-card[data-ability='gait'] .health-overview__ability-insight {
+  color: #4b79d3;
+  background: #eef3fc;
+}
+
+.health-overview__ability-card[data-ability='standing'] .health-overview__ability-insight {
+  color: #e09038;
+  background: #fff9f0;
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.health-overview__ability-card[data-ability='grip'] .health-overview__ability-insight {
+  color: #f8a36d;
+  background: #fff8f4;
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.health-overview__ability-card .health-overview__image-fallback {
+  position: absolute;
+  inset: 0;
+  min-height: 100%;
+}
+
+.health-overview__difference {
+  width: 86.4px;
+  height: 86.4px;
+}
+
+.health-overview__difference > span:first-child,
+.health-overview__difference > span:last-child {
+  font-size: 14.4px;
+  line-height: 19.2px;
+}
+
+.health-overview__difference > span:nth-child(2) {
+  font-size: 26.4px;
+  line-height: 31.2px;
+}
+
+.health-overview__ability-unavailable {
+  display: flex;
+  min-height: 320px;
+}
+
+#advice .health-overview__section-heading {
+  margin-bottom: 32px;
+}
+
+#advice .health-overview__section-heading h2 {
+  font-size: 24px;
+  font-weight: 600;
+  line-height: 33.6px;
+}
+
+.health-overview__advice-grid {
+  gap: 24px;
+}
+
+.health-overview__advice-card {
+  min-height: 0;
+  padding: 24px;
+  border: 1px solid rgb(192 201 188 / 30%);
+  border-radius: 32px;
+  background: #fff;
+  box-shadow: 0 10px 40px -10px rgb(0 0 0 / 4%);
+}
+
+.health-overview__advice-media {
+  width: 96px;
+  height: 96px;
+  margin-bottom: 16px;
+  padding: 12px;
+  overflow: visible;
+}
+
+.health-overview__advice-sprite {
+  display: block;
+  overflow: hidden;
+}
+
+.health-overview__advice-media .health-overview__advice-sprite img {
+  position: absolute;
+  width: 200%;
+  max-width: none;
+  height: 200%;
+  object-fit: cover;
+}
+
+.health-overview__advice-media .health-overview__image-fallback {
+  z-index: 20;
+  min-height: 100%;
+  padding: 8px;
+  border-radius: 50%;
+  color: var(--advice-color);
+  background: var(--advice-soft);
+  font-size: 9px;
+  line-height: 1.25;
+  text-align: center;
+}
+
+.health-overview__advice-card h3 {
+  margin: 0 0 8px;
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 33.6px;
+  overflow-wrap: normal;
+}
+
+.health-overview__advice-accent {
+  display: block;
+  flex: 0 0 auto;
+  width: 32px;
+  height: 4px;
+  margin-bottom: 16px;
+}
+
+.health-overview__advice-action {
+  min-height: 80px;
+  gap: 16px;
+  margin-bottom: 16px;
+  padding: 16px;
+  border-radius: 16px;
+  color: var(--advice-color);
+  background: var(--advice-soft);
+}
+
+.health-overview__advice-action-icon {
+  flex: 0 0 auto;
+  color: var(--advice-color);
+  font-size: 30px;
+}
+
+.health-overview__advice-action-copy {
+  display: block;
+  min-width: 0;
+  color: #191d18;
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 24px;
+}
+
+.health-overview__advice-divider {
+  display: block;
+  flex: 0 0 auto;
+  width: 100%;
+  margin-bottom: 16px;
+  border-color: #c0c9bc;
+}
+
+.health-overview__advice-description {
+  gap: 12px;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  color: #5f5e5b;
+  font-size: 14px;
+  line-height: 24px;
+  text-align: left;
+}
+
+.health-overview__advice-description .material-symbols-outlined {
+  flex: 0 0 auto;
+  color: var(--advice-color);
+  font-size: 20px;
+}
+
+.health-overview__expert,
+.health-overview__peer,
+.health-overview__trend,
+.health-overview__next {
+  border-radius: 40px;
+}
+
+.health-overview__trend-summary {
+  border-radius: 32px;
+}
+
+.health-overview__next-icon {
+  border-radius: 16px;
+}
+
+.health-overview__next button {
+  border-radius: 24px;
+}

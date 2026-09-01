@@ -2,11 +2,17 @@ import React, { useRef, useState, useMemo } from 'react';
 import ReactECharts from 'echarts-for-react';
 import { exportToPdf } from '../../lib/pdfExport';
 import ReportSummaryCard, { BasisNote } from './ReportSummaryCard';
-import { buildComprehensiveScoreResult } from '../../lib/assessmentScoring';
+import {
+  buildComprehensiveScoreResult,
+  ASSESSMENT_KEYS,
+  MODULE_WEIGHT_SCORE,
+  COMPREHENSIVE_MAX_SCORE,
+} from '../../lib/assessmentScoring';
 
 /**
  * 综合评估报告组件
- * 将一组历史评估记录（握力、起坐、站立、步态）汇总为一份综合报告
+ * 将一组历史评估记录（握力、起坐、站立、步态）汇总为一份综合报告。
+ * 各模块单项满分 25 分，计入综合分时按 25 分权重折算，综合总分 100 分。
  */
 
 /* ─── 常量 ─── */
@@ -17,7 +23,7 @@ const ASSESSMENT_LABELS = {
   gait: '行走步态评估',
 };
 
-const ASSESSMENT_ORDER = ['grip', 'sitstand', 'standing', 'gait'];
+const ASSESSMENT_ORDER = ASSESSMENT_KEYS;
 
 const C = {
   blue: '#0066CC',
@@ -266,7 +272,10 @@ export default function ComprehensiveReport({ record, onClose }) {
     [comprehensiveScore],
   );
   // 雷达图
-  const radarOption = useMemo(() => makeRadarOption(gripData, sitstandData, standingData, gaitData, patientInfo.gender), [gripData, sitstandData, standingData, gaitData, patientInfo.gender]);
+  const radarOption = useMemo(
+    () => makeRadarOption(gripData, sitstandData, standingData, gaitData, patientInfo.gender),
+    [gripData, sitstandData, standingData, gaitData, patientInfo.gender],
+  );
 
   const sections = [
     { id: 'overview', title: '综合概览' },
@@ -386,7 +395,7 @@ export default function ComprehensiveReport({ record, onClose }) {
                     </div>
                     <div className="p-2.5 rounded-lg" style={{ background: 'var(--bg-tertiary)' }}>
                       <span style={{ color: 'var(--text-muted)' }}>完成项目</span>
-                      <div className="font-semibold mt-0.5" style={{ color: 'var(--text-primary)' }}>{completedCount} / 4</div>
+                      <div className="font-semibold mt-0.5" style={{ color: 'var(--text-primary)' }}>{completedCount} / {ASSESSMENT_ORDER.length}</div>
                     </div>
                     <div className="p-2.5 rounded-lg" style={{ background: 'var(--bg-tertiary)' }}>
                       <span style={{ color: 'var(--text-muted)' }}>报告生成时间</span>
@@ -407,7 +416,7 @@ export default function ComprehensiveReport({ record, onClose }) {
             </div>
 
             {/* 评估完成状态 */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+            <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3 mb-4">
               {ASSESSMENT_ORDER.map(key => {
                 const completed = assessments[key]?.completed;
                 return (
@@ -445,7 +454,7 @@ export default function ComprehensiveReport({ record, onClose }) {
                 {itemScoreMap.grip && (
                   <div className="mb-4 p-3 rounded-lg text-xs font-semibold"
                     style={{ background: itemScoreMap.grip.bg, color: itemScoreMap.grip.color }}>
-                    握力评分：{itemScoreMap.grip.score}/25 · {itemScoreMap.grip.level}
+                    握力评分：{Math.round(itemScoreMap.grip.weightedScore ?? 0)}/{MODULE_WEIGHT_SCORE}（单项原始 {itemScoreMap.grip.score}/25）· {itemScoreMap.grip.level}
                   </div>
                 )}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
@@ -500,7 +509,7 @@ export default function ComprehensiveReport({ record, onClose }) {
                 {itemScoreMap.sitstand && (
                   <div className="mb-4 p-3 rounded-lg text-xs font-semibold"
                     style={{ background: itemScoreMap.sitstand.bg, color: itemScoreMap.sitstand.color }}>
-                    起坐评分：{itemScoreMap.sitstand.score}/25 · {itemScoreMap.sitstand.level}
+                    起坐评分：{Math.round(itemScoreMap.sitstand.weightedScore ?? 0)}/{MODULE_WEIGHT_SCORE}（单项原始 {itemScoreMap.sitstand.score}/25）· {itemScoreMap.sitstand.level}
                   </div>
                 )}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
@@ -547,7 +556,7 @@ export default function ComprehensiveReport({ record, onClose }) {
                 {itemScoreMap.standing && (
                   <div className="mb-4 p-3 rounded-lg text-xs font-semibold"
                     style={{ background: itemScoreMap.standing.bg, color: itemScoreMap.standing.color }}>
-                    静态站立评分：{itemScoreMap.standing.score}/25 · {itemScoreMap.standing.level}
+                    静态站立评分：{Math.round(itemScoreMap.standing.weightedScore ?? 0)}/{MODULE_WEIGHT_SCORE}（单项原始 {itemScoreMap.standing.score}/25）· {itemScoreMap.standing.level}
                   </div>
                 )}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
@@ -594,7 +603,7 @@ export default function ComprehensiveReport({ record, onClose }) {
                 {itemScoreMap.gait && (
                   <div className="mb-4 p-3 rounded-lg text-xs font-semibold"
                     style={{ background: itemScoreMap.gait.bg, color: itemScoreMap.gait.color }}>
-                    步态评分：{itemScoreMap.gait.score}/25 · {itemScoreMap.gait.level}
+                    步态评分：{Math.round(itemScoreMap.gait.weightedScore ?? 0)}/{MODULE_WEIGHT_SCORE}（单项原始 {itemScoreMap.gait.score}/25）· {itemScoreMap.gait.level}
                   </div>
                 )}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">

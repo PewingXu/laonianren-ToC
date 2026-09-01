@@ -1,0 +1,148 @@
+/*
+ * 报告打印 / PDF 导出样式。
+ *
+ * 这个文件不属于 0810 交付包，是集成层新增的（性质同 embedded.css），
+ * 所有打印相关的取舍都集中在这里，日后交付包升级时便于对照。
+ *
+ * ── 走的是 Chromium 原生打印，不是 html2canvas ──
+ * Electron 里由主进程 webContents.printToPDF 出矢量 PDF（back-end/code/index.js
+ * 的 registerReportPrintIpcHandlers）；浏览器/开发环境退化为 window.print()，
+ * 用户在打印预览里选「另存为 PDF」。两条路都吃这里的 @media print。
+ *
+ * ── 触发方式 ──
+ * front-end/src/lib/reportPdf.jsx 在调用打印前：
+ *   1. 给 <html> 打上 data-printing
+ *   2. 给「报告的滚动容器」打上 data-print-root
+ * 打印结束后两个标记都移除。下面每一条规则都同时锁在 @media print 和
+ * html[data-printing] 之下，所以屏幕态是零影响的 —— 光加属性不打印，什么都不会变。
+ *
+ * ── 为什么用 :has() 而不是逐个标注要隐藏的元素 ──
+ * 报告有 8 个宿主（历史详情/历史综合/首页弹层/4 个采集页测完即看/调试台），
+ * 外壳 chrome 还包括 UpdateNotification、DeviceAlertOverlay、Toast 这些全局挂件，
+ * 逐个打 data-print-hide 一定会漏。改成「不包含报告根、也不在报告根里的都不进纸」，
+ * 新增宿主时不用再动这里。Electron 31 = Chromium 126，:has() 自 105 起支持。
+ *
+ * :has() 的求值只限定在 body/#root 的前三层（下面的选择器都写死了层级），
+ * 不用 `body *` 那种写法 —— 那会对报告里上千个元素各做一次子树扫描，O(n²)。
+ * 报告根在各宿主下的层级：
+ *   #root > div(页面) > main                     ← 深度 2（历史两页、4 个采集页、调试台）
+ *   #root > div.dashboard-v2 > div.fixed > div   ← 深度 3（首页综合报告弹层）
+ */
+
+@media print {
+  /* ─── 1. 纸张 ───
+     printToPDF 那条路传了 preferCSSPageSize:false，pageSize/margins 由主进程给，
+     这里的 @page 只对 window.print() 兜底路径生效。size 不写死，让用户自己在
+     打印预览里选纸；只统一页边距。 */
+  @page {
+    margin: 8mm;
+  }
+
+  /* ─── 2. 放开被 index.css:57 锁死的滚动 ───
+     html, body, #root { height: 100%; overflow: hidden }
+     不解除的话，打印只会拿到「可视的那一屏」，后面所有内容直接丢失。 */
+  html[data-printing],
+  html[data-printing] body,
+  html[data-printing] #root {
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow: visible !important;
+    background: #fff !important;
+  }
+
+  /* ─── 3. 报告的祖先链 ───
+     解除外壳的 h-screen / flex 布局 / overflow-auto / position:fixed（首页弹层）。
+     :has([data-print-root]) 只在 #root 的头两层求值，代价可忽略。 */
+  html[data-printing] #root > *:has([data-print-root]),
+  html[data-printing] #root > * > *:has([data-print-root]) {
+    display: block !important;
+    position: static !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow: visible !important;
+    flex: none !important;
+    background: #fff !important;
+    box-shadow: none !important;
+  }
+
+  /* ─── 4. 与报告无关的一切都不进纸 ───
+     判据：既不包含报告根、本身也不是报告根 → 隐藏。
+     覆盖 body 直属挂件（Toast 之类 portal）+ #root 下前三层的外壳 chrome。
+     报告根内部的元素不会被这些选择器选中（层级都写死了），不用额外排除。 */
+  html[data-printing] body > *:not(:has([data-print-root])),
+  html[data-printing] #root > *:not(:has([data-print-root])),
+  html[data-printing] #root > * > *:not(:has([data-print-root])):not([data-print-root]),
+  html[data-printing] #root > * > * > *:not(:has([data-print-root])):not([data-print-root]) {
+    display: none !important;
+  }
+
+  /* ─── 5. 报告根自身 ───
+     它就是宿主里那个 overflow-auto 的滚动容器，打印时要变成普通文档流块。 */
+  html[data-printing] [data-print-root] {
+    display: block !important;
+    position: static !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow: visible !important;
+    flex: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #fff !important;
+  }
+
+  /* ─── 6. vh 复位 ───
+     health-overview.css:15 的 min-height:120vh 和 :23 的 height:120vh，
+     在打印里 vh 参照的是「纸高」而不是屏高，会切出一串空白页。
+     embedded.css 已经把这两条改成 auto 了，这里显式再写一遍：
+     日后交付包升级把原值带回来时，打印仍然是对的。 */
+  html[data-printing] .health-overview {
+    min-height: 0 !important;
+  }
+  html[data-printing] .health-overview__scroll {
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+  }
+
+  /* ─── 7. 区块尽量不被撕成两页 ───
+     break-inside: avoid 是建议：比一页还高的区块 Chromium 照常切开，不会丢内容。 */
+  html[data-printing] [data-print-root] section,
+  html[data-printing] [data-print-root] .soft-shadow,
+  html[data-printing] [data-print-root] table,
+  html[data-printing] [data-print-root] [class*="__card"],
+  html[data-printing] [data-print-root] [class*="__metric"],
+  html[data-printing] [data-print-root] [class*="__tile"],
+  html[data-printing] [data-print-root] [class*="__advice"],
+  html[data-printing] [data-print-root] [class*="__insight"] {
+    break-inside: avoid;
+  }
+
+  /* ─── 8. 交互态与动画不进纸 ───
+     动画中途截帧会出现半透明/位移错位；悬浮阴影在纸上是脏点。 */
+  html[data-printing] *,
+  html[data-printing] *::before,
+  html[data-printing] *::after {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+
+  /* 「分享报告」「保存提醒」这类按钮在纸上没有意义 */
+  html[data-printing] [data-print-root] button {
+    display: none !important;
+  }
+
+  /* ─── 9. 强制打印底色 ───
+     printToPDF 那条路已经传了 printBackground:true；window.print() 兜底路径要靠
+     这里 —— 打印预览的「背景图形」默认是关的，不写这条的话所有卡片底色、
+     渐变画布、能力色胶片全部消失，导出来只剩黑字白纸。 */
+  html[data-printing] *,
+  html[data-printing] *::before,
+  html[data-printing] *::after {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+}

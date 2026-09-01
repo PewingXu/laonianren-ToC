@@ -6,6 +6,6 @@
  *
  * 需要恢复 AI 时，把 AI_ENABLED 改回 true 即可。
  */
-export const AI_ENABLED = false;
+export const AI_ENABLED = true;
 
 export default { AI_ENABLED };

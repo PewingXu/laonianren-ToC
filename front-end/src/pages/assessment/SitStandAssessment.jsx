@@ -3,7 +3,12 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useAssessment } from '../../contexts/AssessmentContext';
 import { usePressureScene } from '../../hooks/usePressureScene';
 import EChart from '../../components/ui/EChart';
-import SitStandReport from '../../components/report/SitStandReport';
+// ── 0810 报告交付包页面，取代原 SitStandReport ──
+import { SitStandReportPage } from '../../reports-v2/features/sit-stand-report/pages/SitStandReportPage';
+import { createInMemoryReportGateway } from '../../lib/localReportGateway';
+import { shareReportSummary } from '../../lib/reportBoundaries';
+// PDF 导出走 Chromium 原生打印（矢量、可搜索），不走 html2canvas
+import { ReportPdfButton, buildReportFileName } from '../../lib/reportPdf';
 import { generateSitStandReportData } from '../../lib/sitstandReportGenerator';
 import { backendBridge } from '../../lib/BackendBridge';
 
@@ -158,8 +163,11 @@ function SceneControlPanel({ config, onConfigChange }) {
    ═══════════════════════════════════════════ */
 export default function SitStandAssessment() {
   const navigate = useNavigate();
+  // 「测完即看」的报告滚动容器。PDF 导出的打印范围就是它 —— reportPdf.jsx 会在这个
+  // 节点上打 data-print-root，print.css 据此把外壳 header/footer 排除出纸面。
+  const reportScrollRef = useRef(null);
   const location = useLocation();
-  const { patientInfo, institution, completeAssessment, updateAssessmentAiReport, assessments, deviceConnStatus } = useAssessment();
+  const { patientInfo, institution, completeAssessment, assessments, deviceConnStatus } = useAssessment();
   const isGlobalConnected = deviceConnStatus === 'connected';
   const viewReportMode = location.state?.viewReport && assessments.sitstand?.completed;
 
@@ -368,9 +376,20 @@ export default function SitStandAssessment() {
     const s = Math.floor(t / 10);
     return `${String(Math.floor(s / 3600)).padStart(2, '0')}:${String(Math.floor((s % 3600) / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
   };
-  const handleSitStandAiReportReady = useCallback((aiData) => {
-    updateAssessmentAiReport('sitstand', aiData, assessmentIdRef.current);
-  }, [updateAssessmentAiReport]);
+  /*
+   * 交付包报告页的数据源：刚测完还没落库，用内存态 gateway 直接喂 state 里的 reportData。
+   * 必须 useMemo，否则会在交付包 hook 的依赖数组里造成无限取数。
+   *
+   * 原 handleSitStandAiReportReady（AI 文案回写）已移除：交付包页面没有 onAiReportReady 入口，
+   * 一期 AI 区块走其自带的保守降级文案，回写通道二期恢复。
+   */
+  const sitStandReportGateway = useMemo(() => createInMemoryReportGateway({
+    type: 'sitstand',
+    reportData: sitstandReportData,
+    patient: patientInfo,
+    institution,
+    assessmentId: assessmentIdRef.current,
+  }), [sitstandReportData, patientInfo, institution]);
 
   useEffect(() => () => { if (timerRef.current) clearInterval(timerRef.current); }, []);
 
@@ -395,15 +414,17 @@ export default function SitStandAssessment() {
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
               {csvExporting ? '导出中...' : '保存CSV'}
             </button>
+            <ReportPdfButton
+              targetRef={reportScrollRef}
+              fileName={buildReportFileName(patientInfo?.name, '起坐能力评估')}
+              title={`${patientInfo?.name || '未知'} 的起坐能力评估报告`}
+            />
             <button onClick={() => navigate('/dashboard')} className="zeiss-btn-primary text-xs py-2 px-3 md:px-4">返回首页</button>
           </div>
         </header>
-        <main className="flex-1 min-h-0 overflow-auto">
-          <SitStandReport
-            patientInfo={patientInfo}
-            reportData={sitstandReportData}
-            onAiReportReady={handleSitStandAiReportReady}
-          />
+        <main ref={reportScrollRef} className="flex-1 min-h-0 overflow-auto">
+          {/* 不传 recordId：记录还没落库，身份由内存态 gateway 自己给 */}
+          <SitStandReportPage gateway={sitStandReportGateway} onShare={shareReportSummary} />
         </main>
       </div>
     );
