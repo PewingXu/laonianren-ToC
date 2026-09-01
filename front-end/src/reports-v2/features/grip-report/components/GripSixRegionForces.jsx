@@ -1,5 +1,15 @@
-function formatForce(value) {
-  return Number.isFinite(value) ? `${value.toFixed(1)}N` : '--';
+/**
+ * 数值与单位分开渲染：数值要大、单位要小，
+ * 拼成一个字符串就只能同号大小，读数时单位会喧宾夺主。
+ */
+function ForceValue({ value }) {
+  if (!Number.isFinite(value)) return <b className="grip-report__six-region-num">--</b>;
+  return (
+    <>
+      <b className="grip-report__six-region-num">{value.toFixed(1)}</b>
+      <small className="grip-report__six-region-unit">N</small>
+    </>
+  );
 }
 
 export function GripSixRegionForces({ regions }) {
@@ -36,7 +46,7 @@ export function GripSixRegionForces({ regions }) {
             return (
               <div className="grip-report__six-region-row" key={region.key}>
                 <span className="grip-report__six-region-value grip-report__six-region-value--left">
-                  {formatForce(region.leftForce)}
+                  <ForceValue value={region.leftForce} />
                 </span>
                 <span className="grip-report__six-region-track grip-report__six-region-track--left">
                   <i style={{ width: leftWidth }} />
@@ -46,7 +56,7 @@ export function GripSixRegionForces({ regions }) {
                   <i style={{ width: rightWidth }} />
                 </span>
                 <span className="grip-report__six-region-value grip-report__six-region-value--right">
-                  {formatForce(region.rightForce)}
+                  <ForceValue value={region.rightForce} />
                 </span>
               </div>
             );

@@ -1321,7 +1321,7 @@ body:has(.grip-report) {
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  margin-bottom: 12px;
+  margin-bottom: 20px;
 }
 
 .grip-report__analysis-card .grip-report__six-region-header h3 {
@@ -1337,9 +1337,9 @@ body:has(.grip-report) {
 .grip-report__six-region-legend {
   flex: 0 0 auto;
   gap: 16px;
-  color: var(--grip-muted);
-  font-size: 10px;
-  line-height: 16px;
+  color: var(--grip-text);
+  font-size: 12px;
+  line-height: 18px;
 }
 
 .grip-report__six-region-legend span {
@@ -1347,8 +1347,8 @@ body:has(.grip-report) {
 }
 
 .grip-report__six-region-dot {
-  width: 8px;
-  height: 8px;
+  width: 9px;
+  height: 9px;
   border-radius: 50%;
 }
 
@@ -1360,49 +1360,75 @@ body:has(.grip-report) {
   background: var(--grip-orange);
 }
 
+/*
+ * 六区域力量对比（左右发散条形图）。
+ *
+ * 原实现有两处把可读性压没了：
+ *   1. 图表写死 height:120px + space-between，6 行挤在 120px 里，行距不足 6px
+ *   2. 数值和部位名都是 10px —— 这是报告里最需要读数的一张图，字反而最小
+ *
+ * 现在：行高由内容决定（gap 控制间距），数值放大到 15px，
+ * 左右数值列等宽且分别向内对齐，两侧读数落在同一条竖线上。
+ */
 .grip-report__six-region-chart {
   display: flex;
-  height: 120px;
   flex-direction: column;
-  justify-content: space-between;
+  gap: 14px;
 }
 
 .grip-report__six-region-row {
   display: grid;
   min-width: 0;
-  grid-template-columns: 48px minmax(0, 1fr) 56px minmax(0, 1fr) 48px;
+  /* 左值 / 左条 / 部位名 / 右条 / 右值：两侧数值列等宽，视觉对称 */
+  grid-template-columns: 62px minmax(0, 1fr) 64px minmax(0, 1fr) 62px;
   align-items: center;
-  gap: 8px;
-}
-
-.grip-report__six-region-value,
-.grip-report__six-region-name {
-  font-size: 10px;
-  line-height: 14px;
-  white-space: nowrap;
+  gap: 12px;
 }
 
 .grip-report__six-region-value {
-  font-weight: 600;
+  display: flex;
+  align-items: baseline;
+  gap: 2px;
+  white-space: nowrap;
 }
 
+.grip-report__six-region-num {
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.grip-report__six-region-unit {
+  font-size: 10px;
+  line-height: 20px;
+  font-weight: 600;
+  opacity: 0.75;
+}
+
+/* 左侧数值向右靠、右侧向左靠 —— 都朝条形图方向收拢，读数贴着它对应的条 */
 .grip-report__six-region-value--left {
+  justify-content: flex-end;
   color: var(--grip-blue);
-  text-align: right;
 }
 
 .grip-report__six-region-value--right {
+  justify-content: flex-start;
   color: var(--grip-orange);
 }
 
 .grip-report__six-region-name {
-  color: var(--grip-muted);
+  color: var(--grip-text);
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 500;
   text-align: center;
+  white-space: nowrap;
 }
 
 .grip-report__six-region-track {
   display: flex;
-  height: 10px;
+  height: 14px;
   overflow: hidden;
 }
 
@@ -1434,7 +1460,9 @@ body:has(.grip-report) {
 
 .grip-report__six-region-empty {
   display: grid;
-  height: 120px;
+  /* 与有数据时的图表高度相当（6 行 × 20px + 5 × 14px gap ≈ 190px），
+     空态和实态切换时卡片高度不跳变 */
+  min-height: 190px;
   place-items: center;
   margin: 0;
   color: var(--grip-muted);
