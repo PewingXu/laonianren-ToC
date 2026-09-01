@@ -1654,3 +1654,16 @@ body:has(.grip-report) {
   font-size: 12px;
   line-height: 19px;
 }
+
+/* AI 文案生成中的提示（异步返回前显示兜底文案，需要让用户知道还没定稿） */
+.grip-report__ai-summary-pending {
+  margin-left: 10px;
+  border-radius: 999px;
+  background: var(--grip-green-soft);
+  padding: 3px 10px;
+  color: var(--grip-green);
+  font-size: 11px;
+  line-height: 16px;
+  font-weight: 500;
+  white-space: nowrap;
+}

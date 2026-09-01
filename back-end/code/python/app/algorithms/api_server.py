@@ -544,6 +544,26 @@ async def generate_grip_ai_report(request: GripAIReportRequest):
         # 返回 200 + success=false，让前端做 fallback
 
 
+@app.post("/generate-grip-toc-ai-report")
+async def generate_grip_toc_ai_report(request: AssessmentAIReportRequest):
+    """
+    握力报告的 toC 文案（给老人和家属看的那版）。
+
+    与 /generate-grip-ai-report 的区别只在 prompt：那个走 grip，产出
+    left_hand_analysis / clinical_suggestion 这类专业判读；这个走 grip_toc，
+    产出前端 reports-v2 需要的 aiSummary 四段 + advice 三组，措辞口语化。
+
+    入参 assessment_data 是前端 gripReportEnrich.buildGripAiFacts() 的输出
+    （已算好的事实摘要，且不含 kg —— mapper 有含 kg 即整段丢弃的校验）。
+    """
+    return await _generate_assessment_ai_report(
+        "grip_toc",
+        request.patient_info,
+        request.assessment_data,
+        llm_api_key=request.llm_api_key,
+    )
+
+
 @app.post("/generate-sitstand-ai-report")
 async def generate_sitstand_ai_report(request: AssessmentAIReportRequest):
     return await _generate_assessment_ai_report(

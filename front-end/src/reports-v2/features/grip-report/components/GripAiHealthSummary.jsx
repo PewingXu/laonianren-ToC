@@ -6,11 +6,12 @@ import {
   Sprout,
 } from 'lucide-react';
 
-export function GripAiHealthSummary({ healthSummary }) {
+export function GripAiHealthSummary({ healthSummary, pending = false }) {
   return (
     <section
       className="grip-report__ai-summary"
       aria-labelledby="grip-ai-summary-title"
+      aria-busy={pending || undefined}
     >
       <article className="grip-report__ai-summary-card">
         <div className="grip-report__ai-summary-title-row">
@@ -18,6 +19,10 @@ export function GripAiHealthSummary({ healthSummary }) {
             <Bot />
           </span>
           <h2 id="grip-ai-summary-title">AI 健康总结</h2>
+          {/* 生成中给个提示，否则用户会把兜底文案当成最终结果 */}
+          {pending ? (
+            <span className="grip-report__ai-summary-pending">正在生成…</span>
+          ) : null}
         </div>
 
         <div className="grip-report__ai-summary-main">

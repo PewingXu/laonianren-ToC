@@ -281,6 +281,24 @@ export async function generateGripAIReport(patientInfo, gripData) {
   }));
 }
 
+/**
+ * 握力报告的 toC 文案（reports-v2 的「AI 健康总结」+「个性化改善建议」）。
+ *
+ * 与 generateGripAIReport 的区别只在后端 prompt：那个出专业判读，
+ * 这个出面向老人和家属的口语化文案。
+ *
+ * @param {object} patientInfo { name, gender, age }
+ * @param {object} facts       gripReportEnrich.buildGripAiFacts() 的输出
+ * @returns {Promise<{success:boolean,data?:{aiSummary,advice},error?:string}>}
+ */
+export async function generateGripTocAIReport(patientInfo, facts) {
+  if (!AI_ENABLED) return null; // AI 停用：不发起任何请求
+  return postAiReport('/generate-grip-toc-ai-report', withOptionalLlmApiKey({
+    patient_info: patientInfo,
+    assessment_data: facts,
+  }));
+}
+
 export async function generateSitStandAIReport(patientInfo, assessmentData) {
   return postAiReport('/generate-sitstand-ai-report', withOptionalLlmApiKey({
     patient_info: patientInfo,

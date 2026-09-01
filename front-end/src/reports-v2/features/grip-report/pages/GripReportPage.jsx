@@ -8,8 +8,21 @@ import { GripProfessionalAnalysis } from '../components/GripProfessionalAnalysis
 import { GripReportFooter } from '../components/GripReportFooter';
 import { GripReportHeader } from '../components/GripReportHeader';
 import { GripReportState } from '../components/GripReportState';
+import { useGripAiCopy } from '../hooks/useGripAiCopy';
 import { useGripReport } from '../hooks/useGripReport';
 import { mapGripReport } from '../mappers/mapGripReport';
+
+/**
+ * 合并建议：卡片的标题/图标/配色来自 mapper（属于设计），
+ * 只有两条正文来自 AI。AI 没返回就整组用兜底，不混搭。
+ */
+function mergeAdvice(fallback, aiGroups) {
+  if (!Array.isArray(aiGroups)) return fallback;
+  return fallback.map((group) => {
+    const match = aiGroups.find((item) => item.id === group.id);
+    return match ? { ...group, items: [...match.items] } : group;
+  });
+}
 
 function buildShareSummary(data) {
   const score = data.hero.hasScore ? `握力综合评分${data.hero.score}分` : '暂无握力综合评分';
@@ -18,11 +31,19 @@ function buildShareSummary(data) {
 
 export function GripReportPage({ gateway, recordId, onShare }) {
   const [notification, setNotification] = useState({ id: 0, message: '' });
-  const { status, data, error, retry } = useGripReport({
+  const { status, data, error, retry, raw, patient } = useGripReport({
     gateway,
     recordId,
     mapper: mapGripReport,
   });
+
+  /*
+   * AI 文案是异步的，不能挡着报告渲染 —— 数值部分本地就算好了，
+   * 让用户对着空白页等几十秒的网络请求没有道理。
+   * 所以报告先出，AI 回来后再替换掉 mapper 给的兜底文案；
+   * 请求失败或校验不过就一直用兜底，报告永远可读。
+   */
+  const ai = useGripAiCopy(raw, patient);
 
   useEffect(() => {
     if (!notification.message) return undefined;
@@ -89,8 +110,15 @@ export function GripReportPage({ gateway, recordId, onShare }) {
           <GripHero hero={data.hero} unit={data.unit} />
           <GripMetricGrid metrics={data.metrics} onShowDetail={handleShowDetail} />
           <GripProfessionalAnalysis details={data.details} />
-          <GripAiHealthSummary healthSummary={data.healthSummary} />
-          <GripAdvice advice={data.advice} />
+          {/*
+            AI 成功返回才覆盖；否则保持 mapper 的兜底文案。
+            advice 需要保留 mapper 给的 title/icon/tone（AI 只出 items 文字）。
+          */}
+          <GripAiHealthSummary
+            healthSummary={ai.aiSummary || data.healthSummary}
+            pending={ai.status === 'loading'}
+          />
+          <GripAdvice advice={mergeAdvice(data.advice, ai.advice)} />
         </main>
         <GripReportFooter footer={data.footer} />
       </div>
