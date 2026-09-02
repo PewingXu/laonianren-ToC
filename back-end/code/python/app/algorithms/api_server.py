@@ -564,6 +564,50 @@ async def generate_grip_toc_ai_report(request: AssessmentAIReportRequest):
     )
 
 
+@app.post("/generate-sitstand-toc-ai-report")
+async def generate_sitstand_toc_ai_report(request: AssessmentAIReportRequest):
+    """
+    起坐报告的 toC 文案。产出 evaluation.health{preface,result,details[3]}
+    + advice[4]{title,detail,icon}，措辞口语化。
+    入参 assessment_data 是前端 buildSitStandAiFacts() 的输出。
+    """
+    return await _generate_assessment_ai_report(
+        "sitstand_toc",
+        request.patient_info,
+        request.assessment_data,
+        llm_api_key=request.llm_api_key,
+    )
+
+
+@app.post("/generate-standing-toc-ai-report")
+async def generate_standing_toc_ai_report(request: AssessmentAIReportRequest):
+    """
+    静态站立报告的 toC 文案。产出 evaluation（一整段字符串）
+    + advice[3]{id,title,detail}。入参是前端 buildStandingAiFacts() 的输出。
+    """
+    return await _generate_assessment_ai_report(
+        "standing_toc",
+        request.patient_info,
+        request.assessment_data,
+        llm_api_key=request.llm_api_key,
+    )
+
+
+@app.post("/generate-gait-toc-ai-report")
+async def generate_gait_toc_ai_report(request: AssessmentAIReportRequest):
+    """
+    步态报告的 toC 文案。产出 assessmentSummary{body,strength}
+    + scoreExplanation + recommendations[3]（icon/tone 为白名单）。
+    入参是前端 buildGaitAiFacts() 的输出。
+    """
+    return await _generate_assessment_ai_report(
+        "gait_toc",
+        request.patient_info,
+        request.assessment_data,
+        llm_api_key=request.llm_api_key,
+    )
+
+
 @app.post("/generate-sitstand-ai-report")
 async def generate_sitstand_ai_report(request: AssessmentAIReportRequest):
     return await _generate_assessment_ai_report(

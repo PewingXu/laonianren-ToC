@@ -299,6 +299,35 @@ export async function generateGripTocAIReport(patientInfo, facts) {
   }));
 }
 
+/* ── 以下三个是 toC 报告页（reports-v2）用的文案接口 ──
+ * 与同名的非 toc 版本只差 prompt：那些产出专业判读，这些产出
+ * 面向老人和家属的口语化文案，字段形状与各自 mapper 的契约对齐。
+ * 入参 facts 是前端 assessmentAiFacts.buildXxxAiFacts() 的输出。
+ */
+export async function generateSitStandTocAIReport(patientInfo, facts) {
+  if (!AI_ENABLED) return null;
+  return postAiReport('/generate-sitstand-toc-ai-report', withOptionalLlmApiKey({
+    patient_info: patientInfo,
+    assessment_data: facts,
+  }));
+}
+
+export async function generateStandingTocAIReport(patientInfo, facts) {
+  if (!AI_ENABLED) return null;
+  return postAiReport('/generate-standing-toc-ai-report', withOptionalLlmApiKey({
+    patient_info: patientInfo,
+    assessment_data: facts,
+  }));
+}
+
+export async function generateGaitTocAIReport(patientInfo, facts) {
+  if (!AI_ENABLED) return null;
+  return postAiReport('/generate-gait-toc-ai-report', withOptionalLlmApiKey({
+    patient_info: patientInfo,
+    assessment_data: facts,
+  }));
+}
+
 export async function generateSitStandAIReport(patientInfo, assessmentData) {
   return postAiReport('/generate-sitstand-ai-report', withOptionalLlmApiKey({
     patient_info: patientInfo,

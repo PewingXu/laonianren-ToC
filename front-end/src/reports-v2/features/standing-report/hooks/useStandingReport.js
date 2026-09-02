@@ -8,6 +8,10 @@ const initialState = {
   status: 'loading',
   data: null,
   error: null,
+  // raw / patient 供 AI 文案 hook 用：AI 需要的是实测事实摘要，
+  // 而 data 已经是渲染契约（含兜底文案），从里面反推不出原始数值
+  raw: null,
+  patient: null,
 };
 
 export function useStandingReport({ gateway, recordId, mapper }) {
@@ -35,7 +39,7 @@ export function useStandingReport({ gateway, recordId, mapper }) {
           || typeof assessment.assessmentId !== 'string'
           || !assessment.assessmentId.trim()
         ) {
-          setState({ status: 'empty', data: null, error: null });
+          setState({ ...initialState, status: 'empty' });
           return;
         }
 
@@ -47,10 +51,20 @@ export function useStandingReport({ gateway, recordId, mapper }) {
 
         const data = report === null ? null : mapper(record, report);
         setState(data
-          ? { status: 'ready', data, error: null }
-          : { status: 'empty', data: null, error: null });
+          ? {
+            status: 'ready',
+            data,
+            error: null,
+            raw: report?.reportData ?? null,
+            patient: {
+              name: record.patientName ?? '',
+              gender: record.patientGender ?? null,
+              age: record.patientAge ?? null,
+            },
+          }
+          : { ...initialState, status: 'empty' });
       } catch (error) {
-        if (!cancelled) setState({ status: 'error', data: null, error });
+        if (!cancelled) setState({ ...initialState, status: 'error', error });
       }
     }
 

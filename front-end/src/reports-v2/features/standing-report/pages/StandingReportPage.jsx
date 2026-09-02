@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ToastRegion } from '../../health-overview/components/ToastRegion';
 import { StandingDetailsPanel } from '../components/StandingDetailsPanel';
 import { StandingHero } from '../components/StandingHero';
@@ -9,18 +9,41 @@ import { StandingReportState } from '../components/StandingReportState';
 import { StandingSummary } from '../components/StandingSummary';
 import { useStandingReport } from '../hooks/useStandingReport';
 import { mapStandingReport } from '../mappers/mapStandingReport';
+import { buildStandingAiFacts } from '../../../../lib/assessmentAiFacts';
+import { generateStandingTocAIReport } from '../../../../lib/gripPythonApi';
+import {
+  useAssessmentAiCopy,
+  validateStandingCopy,
+} from '../../../shared/useAssessmentAiCopy';
 
 function buildShareSummary(data) {
   const score = data.hero.hasScore ? `站立综合评分${data.hero.score}分` : '暂无站立综合评分';
   return `${data.patientName}的站立详细报告，检测时间${data.recordedAt}，${score}。`;
 }
 
+const AI_KEY_FIELDS = ['left_percent', 'right_percent', 'sway_mm', 'score'];
+
 export function StandingReportPage({ gateway, recordId, onShare }) {
   const [notification, setNotification] = useState({ id: 0, message: '' });
-  const { status, data, error, retry } = useStandingReport({
+  const {
+    status, data, error, retry, raw, patient,
+  } = useStandingReport({
     gateway,
     recordId,
     mapper: mapStandingReport,
+  });
+
+  // AI 文案异步取；失败就一直用 mapper 的兜底，报告永远可读
+  const facts = useMemo(
+    () => (raw ? buildStandingAiFacts(raw, patient) : null),
+    [raw, patient],
+  );
+  const ai = useAssessmentAiCopy({
+    facts,
+    patientInfo: patient,
+    request: generateStandingTocAIReport,
+    validate: validateStandingCopy,
+    keyFields: AI_KEY_FIELDS,
   });
 
   useEffect(() => {
@@ -90,8 +113,12 @@ export function StandingReportPage({ gateway, recordId, onShare }) {
           <StandingDetailsPanel details={data.details} />
           <StandingSummary
             hero={data.hero}
-            summary={data.summary}
-            advice={data.advice}
+            summary={ai.copy?.evaluation
+              ? { ...data.summary, evaluation: ai.copy.evaluation }
+              : data.summary}
+            // 站立的 advice 在 mapper 里没有兜底（缺数据返回 []），
+            // 所以 AI 没回来时这块本来就是空的，直接用 AI 的即可
+            advice={ai.copy?.advice ?? data.advice}
           />
           <StandingReportFooter footer={data.footer} />
         </main>
