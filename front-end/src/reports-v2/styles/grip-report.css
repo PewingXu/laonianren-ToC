@@ -1720,3 +1720,116 @@ body:has(.grip-report) {
   font-weight: 500;
   white-space: nowrap;
 }
+
+/* ════════════════════════════════════════════════
+   二级指标条（更多测量数据）
+   —— 过程性指标，单条信息量小，用紧凑格子承载，
+      避免与「核心指标」四张大卡争夺视觉权重。
+   ════════════════════════════════════════════════ */
+
+.grip-report__secondary-section > h3 {
+  margin: 0 0 16px;
+  padding: 0 8px;
+  font-size: 20px;
+  line-height: 28px;
+  font-weight: 700;
+}
+
+.grip-report__secondary-grid {
+  display: grid;
+  /* auto-fit：4 项时一行 4 个，7 项时自动换行，不需要按数量写死列数 */
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr));
+  gap: 16px;
+}
+
+.grip-report__secondary-card {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 10px;
+  border-radius: 20px;
+  background: var(--grip-panel);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03);
+  padding: 20px;
+}
+
+.grip-report__secondary-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.grip-report__secondary-icon {
+  display: grid;
+  width: 26px;
+  height: 26px;
+  flex: 0 0 26px;
+  place-items: center;
+  border-radius: 50%;
+  /* 底色由 data-tone 决定，见下方 */
+  background: var(--grip-green-soft);
+  color: var(--grip-green);
+}
+
+.grip-report__secondary-icon svg {
+  width: 14px;
+  height: 14px;
+}
+
+.grip-report__secondary-card h4 {
+  margin: 0;
+  color: var(--grip-text);
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 600;
+}
+
+.grip-report__secondary-value {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  margin: 0;
+}
+
+.grip-report__secondary-value strong {
+  color: var(--grip-ink);
+  font-size: 26px;
+  line-height: 32px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.grip-report__secondary-value span {
+  color: var(--grip-muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.grip-report__secondary-note {
+  margin: 0;
+  color: var(--grip-muted);
+  font-size: 11px;
+  line-height: 17px;
+}
+
+/* 四种色调：与四张主卡的配色体系一致 */
+.grip-report__secondary-card[data-tone="green"] .grip-report__secondary-icon {
+  background: var(--grip-green-soft);
+  color: var(--grip-green);
+}
+
+.grip-report__secondary-card[data-tone="blue"] .grip-report__secondary-icon {
+  background: rgba(125, 168, 216, 0.14);
+  color: var(--grip-blue);
+}
+
+.grip-report__secondary-card[data-tone="orange"] .grip-report__secondary-icon {
+  background: rgba(248, 163, 109, 0.16);
+  color: #d97b3c;
+}
+
+.grip-report__secondary-card[data-tone="purple"] .grip-report__secondary-icon {
+  background: rgba(166, 137, 181, 0.16);
+  color: var(--grip-purple);
+}

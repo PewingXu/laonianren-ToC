@@ -256,6 +256,163 @@ function retentionBandLabel(percent) {
 }
 
 /* ════════════════════════════════════════════════
+   二级指标
+   ════════════════════════════════════════════════ */
+
+/**
+ * 从 timeAnalysis 里按标签取值。
+ *
+ * timeAnalysis 是 [{label, value}] 且 value 是带单位的格式化字符串
+ * （如 "0.842 s"）。Python 与前端兜底两条链路都会产出它，但各自的
+ * 原始字段名不完全一致，所以把它当兜底数据源：先读结构化字段，
+ * 读不到再从这里抠数字。
+ */
+function fromTimeAnalysis(hand, label) {
+  const rows = Array.isArray(hand?.timeAnalysis) ? hand.timeAnalysis : [];
+  const row = rows.find((item) => typeof item?.label === 'string' && item.label.includes(label));
+  if (!row) return null;
+  const matched = String(row.value ?? '').match(/-?\d+(?:\.\d+)?/);
+  return matched ? Number(matched[0]) : null;
+}
+
+const PALM_NAMES = ['手掌', '掌部', 'palm'];
+
+function isPalm(finger) {
+  const name = String(finger?.name ?? '').toLowerCase();
+  const key = String(finger?.key ?? '').toLowerCase();
+  return PALM_NAMES.some((n) => name.includes(n) || key.includes(n));
+}
+
+/**
+ * 二级指标：主卡之外、但对读报告的人仍有意义的几项。
+ *
+ * 取舍原则 —— toB 报告里那 13 项「时间与抖动分析」是工程量
+ * （检测阈值、平均角速度、峰值区间起止…），对老人没有解读价值，
+ * 不照搬。这里只留能用一句话说清「说明什么」的：
+ *   发力速度 / 抓握时长 / 抓握抖动 / 接触面积 / 手掌占比 / 最强手指
+ *
+ * 取不到的项返回 null 并在最后过滤掉 —— 宁可少显示，不显示「--」。
+ */
+function buildSecondaryMetrics(mainHand, profile) {
+  if (!isObject(mainHand)) return [];
+
+  const peak = isObject(mainHand.peakInfo) ? mainHand.peakInfo : {};
+
+  // 发力速度：从开始用力到达到最大力用了多久
+  const startTime = toNumber(mainHand.gripStartTime, null) ?? toNumber(peak.start_time, null);
+  const peakTime = toNumber(peak.peak_time, null);
+  const timeToPeak = startTime !== null && peakTime !== null && peakTime >= startTime
+    ? round(peakTime - startTime, 2)
+    : (fromTimeAnalysis(mainHand, '到达峰值耗时') ?? null);
+
+  // 有效抓握时长
+  const gripDuration = posOrNullLocal(mainHand.gripDuration)
+    ?? fromTimeAnalysis(mainHand, '有效抓握时长');
+
+  const shakeCount = toNumber(mainHand.shakeCount ?? mainHand.shake_count, null)
+    ?? fromTimeAnalysis(mainHand, '抖动次数');
+
+  // 接触面积：原始单位 mm²，换成 cm² 更好读
+  const areaMm2 = posOrNullLocal(mainHand.totalArea);
+  const areaCm2 = areaMm2 === null ? null : round(areaMm2 / 100, 1);
+
+  // 手掌占比：手掌力 / 总力。反映是靠手掌压还是靠手指抓
+  const fingers = Array.isArray(mainHand.fingers) ? mainHand.fingers : [];
+  const palm = fingers.find(isPalm);
+  const totalForce = posOrNullLocal(mainHand.totalForce)
+    ?? (fingers.length
+      ? fingers.reduce((sum, f) => sum + (toNumber(f?.force, 0) || 0), 0)
+      : null);
+  const palmForce = palm ? toNumber(palm.force, null) : null;
+  const palmShare = palmForce !== null && totalForce
+    ? round((palmForce / totalForce) * 100, 1)
+    : null;
+
+  // 最强手指（排除手掌）
+  const fingerOnly = fingers.filter((f) => !isPalm(f) && Number.isFinite(toNumber(f?.force, null)));
+  const strongest = fingerOnly.length
+    ? fingerOnly.reduce((best, f) => (toNumber(f.force, 0) > toNumber(best.force, 0) ? f : best))
+    : null;
+
+  const items = [
+    timeToPeak !== null && timeToPeak >= 0 ? {
+      id: 'timeToPeak',
+      label: '发力速度',
+      value: timeToPeak,
+      unit: 's',
+      note: timeToPeak <= 0.6 ? '一使劲就到位' : timeToPeak <= 1.2 ? '发力节奏正常' : '使上劲偏慢',
+      tone: 'green',
+    } : null,
+
+    gripDuration !== null && gripDuration > 0 ? {
+      id: 'gripDuration',
+      label: '抓握时长',
+      value: round(gripDuration, 1),
+      unit: 's',
+      note: gripDuration >= 3 ? '握够了时间' : '偏短，建议握满 3-5 秒',
+      tone: 'blue',
+    } : null,
+
+    shakeCount !== null && shakeCount >= 0 ? {
+      id: 'shake',
+      label: '抓握抖动',
+      value: shakeCount,
+      unit: '次',
+      note: shakeCount <= 2 ? '很稳，几乎不抖' : shakeCount <= 5 ? '有点轻微抖动' : '抖动偏多',
+      tone: 'purple',
+    } : null,
+
+    areaCm2 !== null ? {
+      id: 'contactArea',
+      label: '接触面积',
+      value: areaCm2,
+      unit: 'cm²',
+      note: '手掌和手指压到手套的总面积',
+      tone: 'orange',
+    } : null,
+
+    palmShare !== null ? {
+      id: 'palmShare',
+      label: '手掌出力占比',
+      value: palmShare,
+      unit: '%',
+      note: palmShare >= 55 ? '主要靠手掌压' : palmShare >= 35 ? '手掌和手指配合得当' : '主要靠手指抓',
+      tone: 'green',
+    } : null,
+
+    strongest ? {
+      id: 'strongestFinger',
+      label: '最有劲的手指',
+      value: textOrNull(strongest.name) ?? '—',
+      unit: '',
+      note: `出力 ${round(toNumber(strongest.force, 0), 1)} N`,
+      tone: 'blue',
+      isText: true,
+    } : null,
+
+    profile?.cv !== null && profile?.cv !== undefined ? {
+      id: 'cv',
+      label: '力值波动',
+      value: profile.cv,
+      unit: '%',
+      note: cvBandLabel(profile.cv) ?? '',
+      tone: 'purple',
+    } : null,
+  ];
+
+  return items.filter(Boolean);
+}
+
+function posOrNullLocal(value) {
+  const n = toNumber(value, null);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+function textOrNull(value) {
+  return typeof value === 'string' && value.trim() ? value.trim() : null;
+}
+
+/* ════════════════════════════════════════════════
    主入口
    ════════════════════════════════════════════════ */
 
@@ -428,6 +585,8 @@ export function enrichGripReportData(reportData, { patientInfo, trend } = {}) {
           + `${cvBandLabel(profile.cv)}。这是统计离散度，不是临床分级。`,
       } : null,
       trend: Array.isArray(trend) ? trend : (reportData.details?.trend ?? null),
+      // 二级指标：主卡之外仍有解读价值的几项，取不到的会被过滤掉
+      secondaryMetrics: buildSecondaryMetrics(mainHand, profile),
       breakdown,
       scoreSummary: {
         total: scored.score,

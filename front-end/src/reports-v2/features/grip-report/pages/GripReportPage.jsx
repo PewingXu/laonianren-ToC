@@ -5,6 +5,7 @@ import { GripMetricGrid } from '../components/GripMetricGrid';
 import { GripAdvice } from '../components/GripAdvice';
 import { GripAiHealthSummary } from '../components/GripAiHealthSummary';
 import { GripProfessionalAnalysis } from '../components/GripProfessionalAnalysis';
+import { GripSecondaryMetrics } from '../components/GripSecondaryMetrics';
 import { GripReportFooter } from '../components/GripReportFooter';
 import { GripReportHeader } from '../components/GripReportHeader';
 import { GripReportState } from '../components/GripReportState';
@@ -103,6 +104,7 @@ export function GripReportPage({ gateway, recordId, onShare }) {
         <main className="grip-report__content" aria-label="握力详细报告内容">
           <GripHero hero={data.hero} unit={data.unit} />
           <GripMetricGrid metrics={data.metrics} />
+          <GripSecondaryMetrics metrics={data.details.secondaryMetrics} />
           <GripProfessionalAnalysis details={data.details} />
           {/*
             AI 成功返回才覆盖；否则保持 mapper 的兜底文案。

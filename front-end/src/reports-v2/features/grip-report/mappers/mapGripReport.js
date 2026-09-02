@@ -492,6 +492,44 @@ function mapRedFlags(value) {
   return value.map((item) => textOr(item, '')).filter(Boolean).slice(0, 5);
 }
 
+const SECONDARY_TONES = new Set(['green', 'blue', 'orange', 'purple']);
+
+/**
+ * 二级指标。
+ *
+ * 数值项要求 value 是有限数；文本项（如「最有劲的手指」）用 isText 标记，
+ * value 走字符串校验。任一项不合规就丢弃该项，不影响其余项。
+ */
+function mapSecondaryMetrics(value) {
+  if (!Array.isArray(value)) return [];
+
+  return value
+    .map((item) => {
+      if (!isObject(item)) return null;
+      const id = textOr(item.id, '');
+      const label = textOr(item.label, '');
+      if (!id || !label) return null;
+
+      const isText = item.isText === true;
+      const numericValue = isText ? null : finiteOrNull(item.value);
+      const textValue = isText ? textOr(item.value, '') : '';
+      if (!isText && numericValue === null) return null;
+      if (isText && !textValue) return null;
+
+      return {
+        id,
+        label,
+        value: isText ? textValue : numericValue,
+        isText,
+        unit: textOr(item.unit, ''),
+        note: textOr(item.note, ''),
+        tone: SECONDARY_TONES.has(item.tone) ? item.tone : 'green',
+      };
+    })
+    .filter(Boolean)
+    .slice(0, 8);
+}
+
 function metricMeta(config, hasValue) {
   if (!hasValue) {
     return {
@@ -604,9 +642,11 @@ function buildMetrics(data, forces) {
       unit: '%',
       ...metricMeta(endurance, enduranceValue !== null),
       chartValues: hasEnduranceSeries ? [...enduranceSeries] : [],
-      chartLabels: enduranceLabels.length === 5
+      // 没有曲线数据时连横轴标签也不给：原来会回落到 0s/15s/30s/45s/60s，
+      // 那是 60 秒耐力协议的刻度，本系统一次握持只有几秒，显示出来是误导
+      chartLabels: hasEnduranceSeries && enduranceLabels.length === 5
         ? enduranceLabels
-        : ['0s', '15s', '30s', '45s', '60s'],
+        : [],
       referenceLines: retentionReferenceLines(endurance, endurance.holdSeconds),
     },
   ];
@@ -656,6 +696,7 @@ export function mapGripReport(record, report) {
     cv: mapCv(details.cv),
     trend: mapTrend(details.trend),
     fingerRegions: mapFingerRegions(leftData.fingers, rightData.fingers),
+    secondaryMetrics: mapSecondaryMetrics(details.secondaryMetrics),
     breakdown: mapBreakdown(details.breakdown),
     scoreSummary: mapScoreSummary(details.scoreSummary),
     redFlags: mapRedFlags(details.redFlags),
