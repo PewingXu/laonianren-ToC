@@ -224,7 +224,7 @@ function mapAdvice(value) {
 const FOOTER_FALLBACKS = {
   tip: '握力可作为肌肉力量的参考指标，建议结合专业意见安排复测。',
   disclaimer: '免责声明：本报告仅供参考，不能替代专业医疗诊断。如有不适，请及时就医。',
-  copyright: '© 2026 健康视界。保留所有权利。',
+  copyright: '© 矩侨工业。保留所有权利。',
 };
 
 function mapFooter(value) {
@@ -524,37 +524,7 @@ function textArray(value, expectedLength) {
   return items.every(Boolean) ? items : [];
 }
 
-/**
- * 「查看详情」要跳到的锚点。
- *
- * 交付包原本把 maximum/average/difference 全写死跳 'grip-trials-detail'
- * （三次测试对比卡里的 h3）。但本系统每只手只握一次，那张卡根本不渲染，
- * 于是点「查看详情」什么都不会发生 —— 按钮看着能点，实际是死的。
- *
- * 这里按「专业数据分析」区里真正存在的卡片来定位：
- *   有 CV 卡     → 耐力/保持率跳 CV
- *   有三次对比卡 → 最大/均值跳它
- *   都没有       → 跳评分明细卡（有评分就一定在）
- * 一个都没有时返回空串，组件据此隐藏按钮，不留死按钮。
- */
-function resolveDetailTargets(details) {
-  const hasTrials = Array.isArray(details.trials) && details.trials.length === 3;
-  const hasCv = Boolean(details.cv);
-  const hasBreakdown = Array.isArray(details.breakdown) && details.breakdown.length > 0;
-
-  const fallback = hasBreakdown ? 'grip-score-breakdown' : '';
-  const forceTarget = hasTrials ? 'grip-trials-detail' : fallback;
-  const enduranceTarget = hasCv ? 'grip-endurance-detail' : fallback;
-
-  return {
-    maximum: forceTarget,
-    average: forceTarget,
-    difference: forceTarget,
-    endurance: enduranceTarget,
-  };
-}
-
-function buildMetrics(data, forces, detailTargets) {
+function buildMetrics(data, forces) {
   const metrics = isObject(data.metrics) ? data.metrics : {};
   const maximum = isObject(metrics.maximum) ? metrics.maximum : {};
   const average = isObject(metrics.average) ? metrics.average : {};
@@ -601,7 +571,6 @@ function buildMetrics(data, forces, detailTargets) {
       chartBands: textArray(maximum.gaugeBands, 4),
       chartActiveBand: textOr(maximum.gaugeActiveBand, ''),
       referenceLines: forceReferenceLines(maximum.reference),
-      detailTargetId: detailTargets.maximum,
     },
     {
       id: 'average',
@@ -613,7 +582,6 @@ function buildMetrics(data, forces, detailTargets) {
       chartValues: useAverageBars ? [...averageBars] : [...trials.averages],
       chartLabels: useAverageBars ? [...averageLabels] : ['第一次', '第二次', '第三次'],
       referenceLines: forceReferenceLines(average.reference),
-      detailTargetId: detailTargets.average,
     },
     {
       id: 'difference',
@@ -627,7 +595,6 @@ function buildMetrics(data, forces, detailTargets) {
       rightForce: forces.right,
       forceUnit: 'N',
       referenceLines: differenceReferenceLines(difference.reference),
-      detailTargetId: detailTargets.difference,
     },
     {
       id: 'endurance',
@@ -641,7 +608,6 @@ function buildMetrics(data, forces, detailTargets) {
         ? enduranceLabels
         : ['0s', '15s', '30s', '45s', '60s'],
       referenceLines: retentionReferenceLines(endurance, endurance.holdSeconds),
-      detailTargetId: detailTargets.endurance,
     },
   ];
 }
@@ -684,8 +650,7 @@ export function mapGripReport(record, report) {
   };
   const details = isObject(data.details) ? data.details : {};
 
-  // 先算出「专业数据分析」区实际会渲染哪些卡，指标卡的「查看详情」按这个定位，
-  // 避免按钮指向一个根本不存在的锚点
+  // 「专业数据分析」区实际会渲染哪些卡由这份结果决定
   const mappedDetails = {
     trials: mapDetailTrials(data.trials),
     cv: mapCv(details.cv),
@@ -695,7 +660,6 @@ export function mapGripReport(record, report) {
     scoreSummary: mapScoreSummary(details.scoreSummary),
     redFlags: mapRedFlags(details.redFlags),
   };
-  const detailTargets = resolveDetailTargets(mappedDetails);
 
   return {
     recordId: record.id,
@@ -712,12 +676,11 @@ export function mapGripReport(record, report) {
       right: { totalForce: right, fingers: copyFingers(rightData.fingers) },
     },
     forces,
-    metrics: buildMetrics(data, forces, detailTargets),
+    metrics: buildMetrics(data, forces),
     evaluation: mapEvaluation(data.evaluation, hasCompletePeerComparison),
     healthSummary: mapAiHealthSummary(data.evaluation?.aiSummary),
     advice: mapAdvice(data.advice),
     footer: mapFooter(data.footer),
-    // 上面 detailTargets 已经算过一遍，直接复用，避免两处口径漂移
     details: mappedDetails,
     hero: {
       hasScore,

@@ -22,7 +22,13 @@
 from __future__ import annotations
 
 
-STANDING_TOC_SYSTEM_PROMPT = """你在帮老人看「静静站立」的检测报告，读的人是老人自己和他的子女。
+STANDING_TOC_SYSTEM_PROMPT = """你在帮老人看「静静站立」的检测报告，读的人是受检者本人和家里人。
+
+## 怎么称呼（重要）
+- 全文一律用「您」称呼受检者，例如「您这次…」「建议您…」。
+- **不知道也不需要知道姓名**。绝对不要写出任何姓名、姓氏或称呼，
+  也不要自己造称呼（不许出现「张阿姨」「曹师傅」「李大爷」这类）。
+- 不要用「他」「她」「患者」「受检者」这类第三人称指代，直接对「您」说话。
 
 ## 说话方式（最重要）
 - 像社区医生面对面说话，平实、具体。
@@ -63,7 +69,7 @@ def _line(label: str, value) -> str | None:
 def build_standing_toc_user_prompt(patient_info: dict, summary: dict) -> str:
     """
     Args:
-        patient_info: { name, gender, age }
+        patient_info: { gender, age } —— name 刻意不用，见文件头「怎么称呼」
         summary: 前端算好的事实摘要，期望字段：
             is_valid          bool
             left_percent      float  左脚负重占比
@@ -81,11 +87,10 @@ def build_standing_toc_user_prompt(patient_info: dict, summary: dict) -> str:
             red_flags         list
             invalid_reason    str
     """
-    name = patient_info.get("name") or "这位长辈"
     is_valid = summary.get("is_valid", True)
 
     facts = [
-        _line("姓名", name),
+        # 刻意不给姓名：给了模型就会写进文案，还会自己造「张阿姨」这类称呼
         _line("性别", patient_info.get("gender")),
         _line("年龄", _fmt(patient_info.get("age"), 0, " 岁")),
     ]
@@ -116,7 +121,7 @@ def build_standing_toc_user_prompt(patient_info: dict, summary: dict) -> str:
 
     fact_block = "\n".join(f for f in facts if f)
 
-    return f"""下面是 {name} 这次静态站立检测的结果，请写成给他和家人看的报告文案。
+    return f"""下面是这次静态站立检测的结果，请写成直接对受检者本人说的报告文案（用「您」称呼）。
 
 ## 这次测出来的数据
 {fact_block}

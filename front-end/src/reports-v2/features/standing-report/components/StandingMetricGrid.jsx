@@ -1,4 +1,4 @@
-import { ChevronRight, Footprints } from 'lucide-react';
+import { Footprints } from 'lucide-react';
 import { standingReportImages } from '../assets';
 
 function Value({ value, unit = '' }) {
@@ -134,7 +134,7 @@ function MetricVisual({ metric }) {
   return <FootSupportVisual metric={metric} />;
 }
 
-export function StandingMetricGrid({ metrics, onShowDetail }) {
+export function StandingMetricGrid({ metrics }) {
   return (
     <section className="standing-report__metrics" aria-label="四项核心能力指标">
       {metrics.map((metric) => (
@@ -150,9 +150,6 @@ export function StandingMetricGrid({ metrics, onShowDetail }) {
           <div className="standing-report__metric-body"><MetricVisual metric={metric} /></div>
           <div className="standing-report__metric-result">
             <p>{metric.summary || '数据不足'}</p>
-            <button type="button" aria-label="查看详情" onClick={() => onShowDetail(metric.detailTargetId)}>
-              <ChevronRight aria-hidden="true" />
-            </button>
           </div>
         </article>
       ))}

@@ -86,12 +86,6 @@ export function GripReportPage({ gateway, recordId, onShare }) {
     }
   }
 
-  function handleShowDetail(targetId) {
-    const target = document.getElementById(targetId);
-    if (!target) return;
-    target.scrollIntoView({ block: 'center' });
-    target.focus({ preventScroll: true });
-  }
 
   return (
     <>
@@ -108,7 +102,7 @@ export function GripReportPage({ gateway, recordId, onShare }) {
         />
         <main className="grip-report__content" aria-label="握力详细报告内容">
           <GripHero hero={data.hero} unit={data.unit} />
-          <GripMetricGrid metrics={data.metrics} onShowDetail={handleShowDetail} />
+          <GripMetricGrid metrics={data.metrics} />
           <GripProfessionalAnalysis details={data.details} />
           {/*
             AI 成功返回才覆盖；否则保持 mapper 的兜底文案。

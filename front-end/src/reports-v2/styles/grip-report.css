@@ -1074,18 +1074,34 @@ body:has(.grip-report) {
 .grip-report__professional-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr));
-  align-items: start;
+  /*
+   * stretch 而不是 start：两列内容高度天然不等（右边的评分明细比
+   * 左边的 CV + 六区域高一截），用 start 会让矮的那列下方空出一大块。
+   * 拉平后由列内最后一张卡吸收多余高度，见下面的 flex: 1。
+   */
+  align-items: stretch;
   gap: 24px;
 }
 
 .grip-report__professional-side {
-  display: grid;
+  /*
+   * 用 flex 而不是 grid：需要「最后一张卡吃掉剩余高度」，
+   * flex 的 flex:1 能直接表达；grid 里写 1fr 会在组件返回 null 时
+   * 仍然占住一整行（这正是之前那块留白的成因）。
+   */
+  display: flex;
   min-width: 0;
-  /* 关键：auto 而不是 1fr —— 组件返回 null 时这一行高度归零 */
-  grid-template-rows: auto;
-  grid-auto-rows: auto;
-  align-content: start;
+  flex-direction: column;
   gap: 24px;
+}
+
+.grip-report__professional-side > * {
+  min-height: 0;
+}
+
+/* 只有一张卡时它就是最后一张，同样铺满整列，不会留空 */
+.grip-report__professional-side > :last-child {
+  flex: 1;
 }
 
 /* 右列一张卡都没有时，连 gap 都不该留 */
@@ -1370,9 +1386,18 @@ body:has(.grip-report) {
  * 现在：行高由内容决定（gap 控制间距），数值放大到 15px，
  * 左右数值列等宽且分别向内对齐，两侧读数落在同一条竖线上。
  */
-.grip-report__six-region-chart {
+/* 卡片被拉高时，让图表区跟着长高，而不是把空白堆在卡片底部 */
+.grip-report__six-region-card {
   display: flex;
   flex-direction: column;
+}
+
+.grip-report__six-region-chart {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  /* 有多余高度时把 6 行均匀铺开；高度刚好时等同于 gap: 14px */
+  justify-content: space-evenly;
   gap: 14px;
 }
 

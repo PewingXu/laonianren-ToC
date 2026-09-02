@@ -1,4 +1,3 @@
-import { ChevronDown } from 'lucide-react';
 import { CompletionBars } from './charts/CompletionBars';
 import { ForceBalance } from './charts/ForceBalance';
 import { SpeedGauge } from './charts/SpeedGauge';
@@ -43,7 +42,7 @@ function MetricSummary({ metric }) {
   return <p className="sit-stand-report__metric-summary">{metric.summary}</p>;
 }
 
-export function SitStandMetricCard({ metric, onShowDetail }) {
+export function SitStandMetricCard({ metric }) {
   const Chart = CHARTS[metric.id];
   return (
     <article
@@ -60,17 +59,6 @@ export function SitStandMetricCard({ metric, onShowDetail }) {
       <MetricSummary metric={metric} />
       <Chart metric={metric} />
       <p className="sit-stand-report__metric-range">{metric.reference}</p>
-      <button
-        className="sit-stand-report__detail-button"
-        type="button"
-        aria-label="查看详情"
-        aria-controls={metric.detailTargetId}
-        data-detail-target={metric.detailTargetId}
-        onClick={() => onShowDetail(metric.detailTargetId)}
-      >
-        <span>查看详情</span>
-        <ChevronDown aria-hidden="true" />
-      </button>
     </article>
   );
 }

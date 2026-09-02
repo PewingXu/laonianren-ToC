@@ -87,12 +87,6 @@ export function StandingReportPage({ gateway, recordId, onShare }) {
     }
   }
 
-  function handleShowDetail(targetId) {
-    const target = document.getElementById(targetId);
-    if (!target) return;
-    target.scrollIntoView({ block: 'center' });
-    target.focus({ preventScroll: true });
-  }
 
   return (
     <>
@@ -109,7 +103,7 @@ export function StandingReportPage({ gateway, recordId, onShare }) {
         />
         <main className="standing-report__content" aria-label="站立详细报告内容">
           <StandingHero hero={data.hero} />
-          <StandingMetricGrid metrics={data.metrics} onShowDetail={handleShowDetail} />
+          <StandingMetricGrid metrics={data.metrics} />
           <StandingDetailsPanel details={data.details} />
           <StandingSummary
             hero={data.hero}

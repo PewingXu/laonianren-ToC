@@ -31,7 +31,13 @@ clinical_suggestion 这类字段，术语密集、面向专业人员。
 from __future__ import annotations
 
 
-GRIP_TOC_SYSTEM_PROMPT = """你在帮老人看握力检测报告，读的人是老人自己和他的子女。
+GRIP_TOC_SYSTEM_PROMPT = """你在帮老人看握力检测报告，读的人是受检者本人和家里人。
+
+## 怎么称呼（重要）
+- 全文一律用「您」称呼受检者，例如「您这次…」「建议您…」。
+- **不知道也不需要知道姓名**。绝对不要写出任何姓名、姓氏或称呼，
+  也不要自己造称呼（不许出现「张阿姨」「曹师傅」「李大爷」这类）。
+- 不要用「他」「她」「患者」「受检者」这类第三人称指代，直接对「您」说话。
 
 ## 说话方式（最重要）
 - 像社区医生跟老人面对面说话那样，平实、具体、有温度。
@@ -80,7 +86,7 @@ def build_grip_toc_user_prompt(patient_info: dict, grip_summary: dict) -> str:
     组装 toC 握力文案的 user prompt。
 
     Args:
-        patient_info: { name, gender, age }
+        patient_info: { gender, age } —— name 刻意不用，见文件头「怎么称呼」
         grip_summary: 前端 gripReportEnrich.js 算好的结果摘要，期望字段：
             is_valid          bool   数据是否有效
             max_force_n       float  最大握力（N）
@@ -98,14 +104,13 @@ def build_grip_toc_user_prompt(patient_info: dict, grip_summary: dict) -> str:
             red_flags         list   需要留意的点
             invalid_reason    str    数据无效的原因（is_valid 为 false 时）
     """
-    name = patient_info.get("name") or "这位长辈"
     gender = patient_info.get("gender") or ""
     age = _fmt(patient_info.get("age"), 0, " 岁")
 
     is_valid = grip_summary.get("is_valid", True)
 
     facts = [
-        _line("姓名", name),
+        # 刻意不给姓名：给了模型就会写进文案，还会自己造「张阿姨」这类称呼
         _line("性别", gender),
         _line("年龄", age),
     ]
@@ -134,7 +139,7 @@ def build_grip_toc_user_prompt(patient_info: dict, grip_summary: dict) -> str:
 
     fact_block = "\n".join(f for f in facts if f)
 
-    return f"""下面是 {name} 这次握力检测的结果，请写成给他和家人看的报告文案。
+    return f"""下面是这次握力检测的结果，请写成直接对受检者本人说的报告文案（用「您」称呼）。
 
 ## 这次测出来的数据
 {fact_block}

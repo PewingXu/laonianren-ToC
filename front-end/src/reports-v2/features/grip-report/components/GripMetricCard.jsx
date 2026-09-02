@@ -1,7 +1,6 @@
 import {
   ArrowLeftRight,
   BarChart3,
-  ChevronDown,
   History,
   Scale,
 } from 'lucide-react';
@@ -36,7 +35,7 @@ function MetricSummary({ metric }) {
   );
 }
 
-export function GripMetricCard({ metric, onShowDetail }) {
+export function GripMetricCard({ metric }) {
   const Chart = CHARTS[metric.id];
   const MetricIcon = ICONS[metric.id];
 
@@ -59,26 +58,15 @@ export function GripMetricCard({ metric, onShowDetail }) {
         <Chart metric={metric} />
       </div>
 
+      {/*
+        原来这里还有个「查看详情」按钮，作用只是滚动到同一页下方的
+        「专业数据分析」区 —— 没有展开更多内容，也不跳新页面。
+        对读报告的人没有实际价值，已移除。
+      */}
       <div className="grip-report__metric-footer">
         <div className="grip-report__metric-reference">
           {metric.referenceLines.map((line) => <p key={line}>{line}</p>)}
         </div>
-        {/*
-          没有可跳转的详情区块时不渲染按钮 —— 原来无论如何都渲染，
-          而锚点所在的卡片可能因数据缺失根本没渲染，点了没反应。
-        */}
-        {metric.detailTargetId ? (
-          <button
-            type="button"
-            aria-label="查看详情"
-            aria-controls={metric.detailTargetId}
-            data-detail-target={metric.detailTargetId}
-            onClick={() => onShowDetail(metric.detailTargetId)}
-          >
-            <span>查看详情</span>
-            <ChevronDown aria-hidden="true" />
-          </button>
-        ) : null}
       </div>
     </article>
   );

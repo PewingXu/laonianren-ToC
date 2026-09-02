@@ -101,14 +101,6 @@ export function SitStandReportPage({ gateway, recordId, onShare }) {
     }
   }
 
-  function handleShowDetail(targetId) {
-    const target = document.getElementById(targetId);
-    if (!target) return;
-
-    target.scrollIntoView({ block: 'center' });
-    const heading = target.matches('h2, h3') ? target : target.querySelector('h2, h3');
-    if (heading instanceof HTMLElement) heading.focus({ preventScroll: true });
-  }
 
   return (
     <>
@@ -125,7 +117,7 @@ export function SitStandReportPage({ gateway, recordId, onShare }) {
         />
         <main className="sit-stand-report__content" aria-label="起身详细报告内容">
           <SitStandHero hero={data.hero} />
-          <SitStandMetricGrid metrics={data.metrics} onShowDetail={handleShowDetail} />
+          <SitStandMetricGrid metrics={data.metrics} />
           <SitStandDetailsPanel details={data.details} />
           <section
             className="sit-stand-report__evaluation-grid"
