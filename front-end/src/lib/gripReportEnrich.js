@@ -283,43 +283,33 @@ function isPalm(finger) {
   return PALM_NAMES.some((n) => name.includes(n) || key.includes(n));
 }
 
-/**
- * 二级指标：主卡之外、但对读报告的人仍有意义的几项。
- *
- * 取舍原则 —— toB 报告里那 13 项「时间与抖动分析」是工程量
- * （检测阈值、平均角速度、峰值区间起止…），对老人没有解读价值，
- * 不照搬。这里只留能用一句话说清「说明什么」的：
- *   发力速度 / 抓握时长 / 抓握抖动 / 接触面积 / 手掌占比 / 最强手指
- *
- * 取不到的项返回 null 并在最后过滤掉 —— 宁可少显示，不显示「--」。
- */
-function buildSecondaryMetrics(mainHand, profile) {
-  if (!isObject(mainHand)) return [];
+/** 单只手的二级指标原始值。取不到的一律 null，由调用方决定是否显示该项。 */
+function handSecondaryValues(hand, profile) {
+  if (!isObject(hand)) return null;
 
-  const peak = isObject(mainHand.peakInfo) ? mainHand.peakInfo : {};
+  const peak = isObject(hand.peakInfo) ? hand.peakInfo : {};
 
   // 发力速度：从开始用力到达到最大力用了多久
-  const startTime = toNumber(mainHand.gripStartTime, null) ?? toNumber(peak.start_time, null);
+  const startTime = toNumber(hand.gripStartTime, null) ?? toNumber(peak.start_time, null);
   const peakTime = toNumber(peak.peak_time, null);
   const timeToPeak = startTime !== null && peakTime !== null && peakTime >= startTime
     ? round(peakTime - startTime, 2)
-    : (fromTimeAnalysis(mainHand, '到达峰值耗时') ?? null);
+    : (fromTimeAnalysis(hand, '到达峰值耗时') ?? null);
 
-  // 有效抓握时长
-  const gripDuration = posOrNullLocal(mainHand.gripDuration)
-    ?? fromTimeAnalysis(mainHand, '有效抓握时长');
+  const gripDuration = posOrNullLocal(hand.gripDuration)
+    ?? fromTimeAnalysis(hand, '有效抓握时长');
 
-  const shakeCount = toNumber(mainHand.shakeCount ?? mainHand.shake_count, null)
-    ?? fromTimeAnalysis(mainHand, '抖动次数');
+  const shakeCount = toNumber(hand.shakeCount ?? hand.shake_count, null)
+    ?? fromTimeAnalysis(hand, '抖动次数');
 
   // 接触面积：原始单位 mm²，换成 cm² 更好读
-  const areaMm2 = posOrNullLocal(mainHand.totalArea);
+  const areaMm2 = posOrNullLocal(hand.totalArea);
   const areaCm2 = areaMm2 === null ? null : round(areaMm2 / 100, 1);
 
   // 手掌占比：手掌力 / 总力。反映是靠手掌压还是靠手指抓
-  const fingers = Array.isArray(mainHand.fingers) ? mainHand.fingers : [];
+  const fingers = Array.isArray(hand.fingers) ? hand.fingers : [];
   const palm = fingers.find(isPalm);
-  const totalForce = posOrNullLocal(mainHand.totalForce)
+  const totalForce = posOrNullLocal(hand.totalForce)
     ?? (fingers.length
       ? fingers.reduce((sum, f) => sum + (toNumber(f?.force, 0) || 0), 0)
       : null);
@@ -334,68 +324,139 @@ function buildSecondaryMetrics(mainHand, profile) {
     ? fingerOnly.reduce((best, f) => (toNumber(f.force, 0) > toNumber(best.force, 0) ? f : best))
     : null;
 
+  return {
+    timeToPeak: timeToPeak !== null && timeToPeak >= 0 ? timeToPeak : null,
+    gripDuration: gripDuration !== null && gripDuration > 0 ? round(gripDuration, 1) : null,
+    shake: shakeCount !== null && shakeCount >= 0 ? shakeCount : null,
+    contactArea: areaCm2,
+    palmShare,
+    strongestFinger: strongest ? textOrNull(strongest.name) : null,
+    strongestFingerForce: strongest ? round(toNumber(strongest.force, 0), 1) : null,
+    cv: profile?.cv ?? null,
+  };
+}
+
+/**
+ * 二级指标：主卡之外、但对读报告的人仍有意义的几项。
+ *
+ * 每一项左右手各有一个值 —— 这些全是单手测量量（发力多快、握了多久、
+ * 抖了几次…），只报强侧会丢掉另一只手的信息。所以一张卡里并排给两个值，
+ * 配色沿用六区域力量图的口径（左手蓝 / 右手橙）。
+ *
+ * 取舍原则 —— toB 报告里那 13 项「时间与抖动分析」是工程量
+ * （检测阈值、平均角速度、峰值区间起止…），对老人没有解读价值，不照搬。
+ * 这里只留能用一句话说清「说明什么」的。
+ *
+ * 左右都取不到的项整条丢弃 —— 宁可少显示，不显示「--」。
+ */
+function buildSecondaryMetrics(leftHand, rightHand, leftProfile, rightProfile) {
+  const L = handSecondaryValues(leftHand, leftProfile);
+  const R = handSecondaryValues(rightHand, rightProfile);
+  if (!L && !R) return [];
+
+  const pick = (key) => [L?.[key] ?? null, R?.[key] ?? null];
+
+  /** 两侧都有值时取较好的一侧来写注解；只有一侧就用那一侧 */
+  const best = (pair, lowerIsBetter) => {
+    const [l, r] = pair;
+    if (l === null) return r;
+    if (r === null) return l;
+    return lowerIsBetter ? Math.min(l, r) : Math.max(l, r);
+  };
+
+  const some = (pair) => pair[0] !== null || pair[1] !== null;
+
+  const timeToPeak = pick('timeToPeak');
+  const gripDuration = pick('gripDuration');
+  const shake = pick('shake');
+  const contactArea = pick('contactArea');
+  const palmShare = pick('palmShare');
+  const strongestFinger = pick('strongestFinger');
+  const cv = pick('cv');
+
   const items = [
-    timeToPeak !== null && timeToPeak >= 0 ? {
+    some(timeToPeak) ? {
       id: 'timeToPeak',
       label: '发力速度',
-      value: timeToPeak,
+      left: timeToPeak[0],
+      right: timeToPeak[1],
       unit: 's',
-      note: timeToPeak <= 0.6 ? '一使劲就到位' : timeToPeak <= 1.2 ? '发力节奏正常' : '使上劲偏慢',
+      note: (() => {
+        const b = best(timeToPeak, true);
+        return b <= 0.6 ? '一使劲就到位' : b <= 1.2 ? '发力节奏正常' : '使上劲偏慢';
+      })(),
       tone: 'green',
     } : null,
 
-    gripDuration !== null && gripDuration > 0 ? {
+    some(gripDuration) ? {
       id: 'gripDuration',
       label: '抓握时长',
-      value: round(gripDuration, 1),
+      left: gripDuration[0],
+      right: gripDuration[1],
       unit: 's',
-      note: gripDuration >= 3 ? '握够了时间' : '偏短，建议握满 3-5 秒',
+      note: best(gripDuration, false) >= 3 ? '握够了时间' : '偏短，建议握满 3-5 秒',
       tone: 'blue',
     } : null,
 
-    shakeCount !== null && shakeCount >= 0 ? {
+    some(shake) ? {
       id: 'shake',
       label: '抓握抖动',
-      value: shakeCount,
+      left: shake[0],
+      right: shake[1],
       unit: '次',
-      note: shakeCount <= 2 ? '很稳，几乎不抖' : shakeCount <= 5 ? '有点轻微抖动' : '抖动偏多',
+      note: (() => {
+        const b = best(shake, true);
+        return b <= 2 ? '很稳，几乎不抖' : b <= 5 ? '有点轻微抖动' : '抖动偏多';
+      })(),
       tone: 'purple',
     } : null,
 
-    areaCm2 !== null ? {
+    some(contactArea) ? {
       id: 'contactArea',
       label: '接触面积',
-      value: areaCm2,
+      left: contactArea[0],
+      right: contactArea[1],
       unit: 'cm²',
       note: '手掌和手指压到手套的总面积',
       tone: 'orange',
     } : null,
 
-    palmShare !== null ? {
+    some(palmShare) ? {
       id: 'palmShare',
       label: '手掌出力占比',
-      value: palmShare,
+      left: palmShare[0],
+      right: palmShare[1],
       unit: '%',
-      note: palmShare >= 55 ? '主要靠手掌压' : palmShare >= 35 ? '手掌和手指配合得当' : '主要靠手指抓',
+      note: (() => {
+        const b = best(palmShare, false);
+        return b >= 55 ? '主要靠手掌压' : b >= 35 ? '手掌和手指配合得当' : '主要靠手指抓';
+      })(),
       tone: 'green',
     } : null,
 
-    strongest ? {
+    some(strongestFinger) ? {
       id: 'strongestFinger',
       label: '最有劲的手指',
-      value: textOrNull(strongest.name) ?? '—',
+      left: strongestFinger[0],
+      right: strongestFinger[1],
       unit: '',
-      note: `出力 ${round(toNumber(strongest.force, 0), 1)} N`,
+      note: [
+        L?.strongestFingerForce !== null && L?.strongestFingerForce !== undefined
+          ? `左 ${L.strongestFingerForce} N` : null,
+        R?.strongestFingerForce !== null && R?.strongestFingerForce !== undefined
+          ? `右 ${R.strongestFingerForce} N` : null,
+      ].filter(Boolean).join(' ｜ '),
       tone: 'blue',
       isText: true,
     } : null,
 
-    profile?.cv !== null && profile?.cv !== undefined ? {
+    some(cv) ? {
       id: 'cv',
       label: '力值波动',
-      value: profile.cv,
+      left: cv[0],
+      right: cv[1],
       unit: '%',
-      note: cvBandLabel(profile.cv) ?? '',
+      note: cvBandLabel(best(cv, true)) ?? '',
       tone: 'purple',
     } : null,
   ];
@@ -410,6 +471,83 @@ function posOrNullLocal(value) {
 
 function textOrNull(value) {
   return typeof value === 'string' && value.trim() ? value.trim() : null;
+}
+
+/* ════════════════════════════════════════════════
+   力-时间曲线
+   ════════════════════════════════════════════════ */
+
+/** 曲线渲染点数。500 点画在 ~700px 宽里过密，等距抽到这个数足够平滑 */
+const CURVE_POINTS = 120;
+
+/**
+ * 把一只手的力-时间序列抽成定长点集。
+ *
+ * 用等距索引抽样而不是滑窗平均：握力曲线的峰值是关键信息，
+ * 平均会把尖峰削平。抽样后再单独把真实峰值点标出来。
+ */
+function handCurve(hand) {
+  const series = handSeries(hand);
+  if (!series) return null;
+
+  const { times, total } = series;
+  const n = times.length;
+  const step = Math.max(1, Math.floor(n / CURVE_POINTS));
+
+  const points = [];
+  for (let i = 0; i < n; i += step) {
+    const t = toNumber(times[i], null);
+    const f = toNumber(total[i], null);
+    if (t === null || f === null) continue;
+    points.push({ t: round(t, 3), f: round(f, 1) });
+  }
+  // 保证收尾点在，否则曲线会在末尾被截断
+  const lastT = toNumber(times[n - 1], null);
+  const lastF = toNumber(total[n - 1], null);
+  if (lastT !== null && lastF !== null && points[points.length - 1]?.t !== round(lastT, 3)) {
+    points.push({ t: round(lastT, 3), f: round(lastF, 1) });
+  }
+  if (points.length < 4) return null;
+
+  const peakF = Math.max(...total.map((v) => toNumber(v, 0) || 0));
+  const peakIdx = total.findIndex((v) => (toNumber(v, 0) || 0) === peakF);
+  const peakT = peakIdx >= 0 ? toNumber(times[peakIdx], null) : null;
+
+  return {
+    points,
+    peak: peakT !== null ? { t: round(peakT, 3), f: round(peakF, 1) } : null,
+    duration: round(times[n - 1] - times[0], 2),
+  };
+}
+
+/**
+ * 左右手的力-时间曲线，共用一套坐标轴。
+ *
+ * 只做「总力」这一条，不做各手指的堆叠图 —— 六区域力量那张图已经把
+ * 分区信息讲清楚了，再叠 6 条线对读报告的人是噪音。
+ *
+ * 也刻意不导出欧拉角/角速度曲线：前端算法链路里 eulerData 是
+ * Math.random() 造的正弦波（gripReportGenerator.js:186-188），
+ * angularVelocity 由它派生，画出来是假数据。
+ */
+function buildForceCurve(leftHand, rightHand) {
+  const left = handCurve(leftHand);
+  const right = handCurve(rightHand);
+  if (!left && !right) return null;
+
+  const maxForce = Math.max(
+    left?.peak?.f ?? 0,
+    right?.peak?.f ?? 0,
+  );
+  if (!(maxForce > 0)) return null;
+
+  return {
+    left,
+    right,
+    maxForce: round(maxForce, 1),
+    maxDuration: round(Math.max(left?.duration ?? 0, right?.duration ?? 0), 2),
+    unit: 'N',
+  };
 }
 
 /* ════════════════════════════════════════════════
@@ -585,8 +723,12 @@ export function enrichGripReportData(reportData, { patientInfo, trend } = {}) {
           + `${cvBandLabel(profile.cv)}。这是统计离散度，不是临床分级。`,
       } : null,
       trend: Array.isArray(trend) ? trend : (reportData.details?.trend ?? null),
-      // 二级指标：主卡之外仍有解读价值的几项，取不到的会被过滤掉
-      secondaryMetrics: buildSecondaryMetrics(mainHand, profile),
+      // 二级指标：主卡之外仍有解读价值的几项，左右手各给一个值，
+      // 两侧都取不到的整条过滤掉
+      secondaryMetrics: buildSecondaryMetrics(leftHand, rightHand, leftProfile, rightProfile),
+      // 力-时间曲线（左右手同轴）。不含欧拉角/角速度 —— 那两条在前端
+      // 算法链路里是伪造数据，见 buildForceCurve 的说明
+      forceCurve: buildForceCurve(leftHand, rightHand),
       breakdown,
       scoreSummary: {
         total: scored.score,

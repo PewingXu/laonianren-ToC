@@ -34,6 +34,29 @@ const ICONS = {
   cv: Activity,
 };
 
+/**
+ * 单侧读数。缺测时显示「未测」而不是 0 或 --，
+ * 避免看成「测出来是 0」。
+ */
+function HandValue({ side, value, unit, isText }) {
+  const missing = value === null || value === undefined;
+  return (
+    <div className="grip-report__secondary-hand" data-side={side}>
+      <span className="grip-report__secondary-hand-label">
+        {side === 'left' ? '左手' : '右手'}
+      </span>
+      {missing ? (
+        <span className="grip-report__secondary-hand-missing">未测</span>
+      ) : (
+        <span className="grip-report__secondary-hand-value">
+          <strong>{value}</strong>
+          {!isText && unit ? <small>{unit}</small> : null}
+        </span>
+      )}
+    </div>
+  );
+}
+
 export function GripSecondaryMetrics({ metrics }) {
   const items = Array.isArray(metrics) ? metrics : [];
   if (items.length === 0) return null;
@@ -43,7 +66,14 @@ export function GripSecondaryMetrics({ metrics }) {
       className="grip-report__secondary-section"
       aria-labelledby="grip-secondary-title"
     >
-      <h3 id="grip-secondary-title">更多测量数据</h3>
+      <div className="grip-report__secondary-header">
+        <h3 id="grip-secondary-title">更多测量数据</h3>
+        {/* 与六区域力量图同一套左右配色，读者不用重新学一遍 */}
+        <div className="grip-report__secondary-legend" aria-hidden="true">
+          <span><i data-side="left" />左手</span>
+          <span><i data-side="right" />右手</span>
+        </div>
+      </div>
       <div className="grip-report__secondary-grid">
         {items.map((item) => {
           const Icon = ICONS[item.id] || Activity;
@@ -59,10 +89,10 @@ export function GripSecondaryMetrics({ metrics }) {
                 </span>
                 <h4>{item.label}</h4>
               </div>
-              <p className="grip-report__secondary-value">
-                <strong>{item.value}</strong>
-                {item.unit ? <span>{item.unit}</span> : null}
-              </p>
+              <div className="grip-report__secondary-values">
+                <HandValue side="left" value={item.left} unit={item.unit} isText={item.isText} />
+                <HandValue side="right" value={item.right} unit={item.unit} isText={item.isText} />
+              </div>
               {item.note ? <p className="grip-report__secondary-note">{item.note}</p> : null}
             </article>
           );

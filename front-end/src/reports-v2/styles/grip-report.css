@@ -775,210 +775,6 @@ body:has(.grip-report) {
   font-weight: 700;
 }
 
-.grip-report__ai-summary {
-  min-width: 0;
-}
-
-.grip-report__ai-summary-card {
-  overflow: hidden;
-  border: 1px solid #dfe5df;
-  border-radius: 24px;
-  background: var(--grip-panel);
-  box-shadow:
-    0 14px 34px rgba(38, 55, 46, 0.07),
-    inset 0 0 30px rgba(232, 239, 233, 0.38);
-  padding: 28px 32px 26px;
-}
-
-.grip-report__ai-summary-title-row,
-.grip-report__ai-summary-copy,
-.grip-report__ai-summary-focus {
-  display: flex;
-  align-items: flex-start;
-}
-
-.grip-report__ai-summary-title-row {
-  align-items: center;
-  gap: 14px;
-  margin-bottom: 24px;
-}
-
-.grip-report__ai-summary-title-row h2 {
-  margin: 0;
-  font-size: 22px;
-  line-height: 30px;
-  font-weight: 900;
-  letter-spacing: 0;
-}
-
-.grip-report__ai-summary-icon {
-  display: grid;
-  width: 48px;
-  height: 48px;
-  flex: 0 0 48px;
-  place-items: center;
-  border-radius: 50%;
-  background: var(--grip-green-soft);
-  color: var(--grip-green);
-}
-
-.grip-report__ai-summary-icon svg {
-  width: 27px;
-  height: 27px;
-  stroke-width: 2.2;
-}
-
-.grip-report__ai-summary-main {
-  display: grid;
-  min-height: 190px;
-  grid-template-columns: minmax(0, 1fr) 220px;
-  align-items: center;
-  gap: 32px;
-}
-
-.grip-report__ai-summary-copy {
-  min-width: 0;
-  gap: 16px;
-}
-
-.grip-report__ai-summary-copy > div,
-.grip-report__ai-summary-focus > div {
-  min-width: 0;
-}
-
-.grip-report__ai-summary-copy h3,
-.grip-report__ai-summary-focus h3,
-.grip-report__ai-summary-copy p,
-.grip-report__ai-summary-focus p {
-  margin: 0;
-  letter-spacing: 0;
-  overflow-wrap: anywhere;
-}
-
-.grip-report__ai-summary-copy h3 {
-  color: var(--grip-green);
-  font-size: 26px;
-  line-height: 36px;
-  font-weight: 900;
-}
-
-.grip-report__ai-summary-copy p {
-  max-width: 700px;
-  margin-top: 14px;
-  color: var(--grip-text);
-  font-size: 16px;
-  line-height: 30px;
-  font-weight: 500;
-}
-
-.grip-report__ai-summary-illustration {
-  position: relative;
-  width: 220px;
-  height: 190px;
-  justify-self: end;
-}
-
-.grip-report__ai-summary-report {
-  position: absolute;
-  top: 8px;
-  right: 22px;
-  width: 146px;
-  height: 174px;
-  border: 3px solid #d5e2d6;
-  border-radius: 14px;
-  background: #fbfdfb;
-  box-shadow: 0 12px 22px rgba(72, 91, 76, 0.14);
-  padding: 22px 18px;
-}
-
-.grip-report__ai-summary-chart {
-  width: 84px;
-  height: 52px;
-  color: #87b78c;
-  stroke-width: 1.8;
-}
-
-.grip-report__ai-summary-report-line {
-  display: block;
-  width: 70px;
-  height: 7px;
-  margin-top: 10px;
-  border-radius: 999px;
-  background: #d9e6da;
-}
-
-.grip-report__ai-summary-report-line--long {
-  width: 94px;
-  margin-top: 8px;
-}
-
-.grip-report__ai-summary-report-line--short {
-  width: 52px;
-  margin-top: 8px;
-}
-
-.grip-report__ai-summary-report-check {
-  position: absolute;
-  right: -13px;
-  bottom: -11px;
-  display: grid;
-  width: 42px;
-  height: 42px;
-  place-items: center;
-  border: 4px solid var(--grip-panel);
-  border-radius: 50%;
-  background: var(--grip-green);
-  color: #fff;
-}
-
-.grip-report__ai-summary-report-check svg {
-  width: 23px;
-  height: 23px;
-}
-
-.grip-report__ai-summary-sparkle {
-  position: absolute;
-  width: 25px;
-  height: 25px;
-  color: #9fc8a3;
-  stroke-width: 1.7;
-}
-
-.grip-report__ai-summary-sparkle--left {
-  left: 4px;
-  bottom: 26px;
-}
-
-.grip-report__ai-summary-sparkle--right {
-  top: 18px;
-  right: 0;
-}
-
-.grip-report__ai-summary-divider {
-  height: 1px;
-  margin: 22px 0;
-  background: var(--grip-line);
-}
-
-.grip-report__ai-summary-focus {
-  gap: 16px;
-}
-
-.grip-report__ai-summary-focus h3 {
-  color: var(--grip-green);
-  font-size: 20px;
-  line-height: 28px;
-  font-weight: 900;
-}
-
-.grip-report__ai-summary-focus p {
-  margin-top: 8px;
-  color: var(--grip-text);
-  font-size: 15px;
-  line-height: 28px;
-  font-weight: 500;
-}
-
 .grip-report__advice-card {
   min-height: 212px;
   border-top: 4px solid var(--grip-green);
@@ -1709,36 +1505,58 @@ body:has(.grip-report) {
 }
 
 /* AI 文案生成中的提示（异步返回前显示兜底文案，需要让用户知道还没定稿） */
-.grip-report__ai-summary-pending {
-  margin-left: 10px;
-  border-radius: 999px;
-  background: var(--grip-green-soft);
-  padding: 3px 10px;
-  color: var(--grip-green);
-  font-size: 11px;
-  line-height: 16px;
-  font-weight: 500;
-  white-space: nowrap;
-}
 
 /* ════════════════════════════════════════════════
    二级指标条（更多测量数据）
-   —— 过程性指标，单条信息量小，用紧凑格子承载，
+   —— 过程性指标，每项左右手各一个值。用紧凑格子承载，
       避免与「核心指标」四张大卡争夺视觉权重。
+      左右配色与六区域力量图一致（左蓝 / 右橙）。
    ════════════════════════════════════════════════ */
 
-.grip-report__secondary-section > h3 {
-  margin: 0 0 16px;
+.grip-report__secondary-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
   padding: 0 8px;
+}
+
+.grip-report__secondary-header h3 {
+  margin: 0;
   font-size: 20px;
   line-height: 28px;
   font-weight: 700;
 }
 
+.grip-report__secondary-legend {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 16px;
+  color: var(--grip-text);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.grip-report__secondary-legend span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.grip-report__secondary-legend i {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+}
+
+.grip-report__secondary-legend i[data-side="left"] { background: var(--grip-blue); }
+.grip-report__secondary-legend i[data-side="right"] { background: var(--grip-orange); }
+
 .grip-report__secondary-grid {
   display: grid;
-  /* auto-fit：4 项时一行 4 个，7 项时自动换行，不需要按数量写死列数 */
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr));
+  /* auto-fit：项数变化不用改列数；240px 是放下两个读数的最小宽度 */
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
   gap: 16px;
 }
 
@@ -1746,7 +1564,7 @@ body:has(.grip-report) {
   display: flex;
   min-width: 0;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
   border-radius: 20px;
   background: var(--grip-panel);
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03);
@@ -1766,7 +1584,6 @@ body:has(.grip-report) {
   flex: 0 0 26px;
   place-items: center;
   border-radius: 50%;
-  /* 底色由 data-tone 决定，见下方 */
   background: var(--grip-green-soft);
   color: var(--grip-green);
 }
@@ -1784,26 +1601,75 @@ body:has(.grip-report) {
   font-weight: 600;
 }
 
-.grip-report__secondary-value {
-  display: flex;
-  align-items: baseline;
-  gap: 4px;
-  margin: 0;
+/* 左右两个读数并排，中间一条分隔线 */
+.grip-report__secondary-values {
+  display: grid;
+  grid-template-columns: 1fr 1px 1fr;
+  align-items: center;
+  gap: 12px;
 }
 
-.grip-report__secondary-value strong {
-  color: var(--grip-ink);
-  font-size: 26px;
-  line-height: 32px;
+.grip-report__secondary-values::before {
+  content: "";
+  grid-column: 2;
+  grid-row: 1;
+  align-self: stretch;
+  background: var(--grip-line);
+}
+
+.grip-report__secondary-hand {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.grip-report__secondary-hand[data-side="left"] { grid-column: 1; }
+.grip-report__secondary-hand[data-side="right"] { grid-column: 3; }
+
+/* 读者是老人，10px 太细。放到 12px 并加重字重，与数值形成层次但仍看得清 */
+.grip-report__secondary-hand-label {
+  color: var(--grip-text);
+  font-size: 12px;
+  line-height: 17px;
+  font-weight: 600;
+}
+
+.grip-report__secondary-hand-value {
+  display: flex;
+  align-items: baseline;
+  gap: 2px;
+  white-space: nowrap;
+}
+
+.grip-report__secondary-hand-value strong {
+  font-size: 22px;
+  line-height: 28px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   overflow-wrap: anywhere;
 }
 
-.grip-report__secondary-value span {
+.grip-report__secondary-hand-value small {
   color: var(--grip-muted);
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
+}
+
+/* 左蓝右橙，与六区域力量图同口径 */
+.grip-report__secondary-hand[data-side="left"] .grip-report__secondary-hand-value strong {
+  color: var(--grip-blue);
+}
+
+.grip-report__secondary-hand[data-side="right"] .grip-report__secondary-hand-value strong {
+  color: var(--grip-orange);
+}
+
+/* 缺测：明确写「未测」，不能显示成 0 或 -- 让人误以为测出来是 0 */
+.grip-report__secondary-hand-missing {
+  color: var(--grip-muted);
+  font-size: 14px;
+  line-height: 28px;
 }
 
 .grip-report__secondary-note {
@@ -1813,7 +1679,6 @@ body:has(.grip-report) {
   line-height: 17px;
 }
 
-/* 四种色调：与四张主卡的配色体系一致 */
 .grip-report__secondary-card[data-tone="green"] .grip-report__secondary-icon {
   background: var(--grip-green-soft);
   color: var(--grip-green);
@@ -1832,4 +1697,168 @@ body:has(.grip-report) {
 .grip-report__secondary-card[data-tone="purple"] .grip-report__secondary-icon {
   background: rgba(166, 137, 181, 0.16);
   color: var(--grip-purple);
+}
+
+/* ════════════════════════════════════════════════
+   握力全程曲线
+   —— 手写 SVG，与交付包其余图表同一视觉语言；
+      左蓝右橙，与六区域力量图、二级指标同口径。
+   ════════════════════════════════════════════════ */
+
+.grip-report__curve-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.grip-report__curve-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.grip-report__analysis-card .grip-report__curve-header h3 {
+  margin: 0;
+}
+
+.grip-report__curve-header p {
+  margin: 4px 0 0;
+  color: var(--grip-muted);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.grip-report__curve-legend {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 16px;
+  color: var(--grip-text);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.grip-report__curve-legend span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.grip-report__curve-legend i {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+}
+
+.grip-report__curve-legend i[data-side="left"] { background: var(--grip-blue); }
+.grip-report__curve-legend i[data-side="right"] { background: var(--grip-orange); }
+
+.grip-report__curve-svg {
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+
+.grip-report__curve-gridline {
+  stroke: var(--grip-line);
+  stroke-width: 1;
+  stroke-dasharray: 3 4;
+}
+
+.grip-report__curve-axis-label {
+  fill: var(--grip-muted);
+  font-size: 11px;
+}
+
+.grip-report__curve-note {
+  margin: 0;
+  color: var(--grip-muted);
+  font-size: 11px;
+  line-height: 17px;
+}
+
+/* 曲线占整行，与下方的两列网格拉开间距 */
+.grip-report__professional-full {
+  margin-bottom: 24px;
+}
+
+/* ════════════════════════════════════════════════
+   结论与建议卡（原「AI 健康总结」）
+   —— 去掉了插画/闪光/圆形图标徽章。这块是全报告最需要
+      被当真的内容，装饰越少越可信。
+   ════════════════════════════════════════════════ */
+
+.grip-report__ai-summary {
+  min-width: 0;
+}
+
+.grip-report__ai-summary-card {
+  position: relative;
+  overflow: hidden;
+  border-radius: 24px;
+  background: var(--grip-panel);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03);
+  padding: 30px 34px 24px;
+}
+
+/* 左侧一条细强调线：绿色只在这里出现，正文不再通篇绿字 */
+.grip-report__ai-summary-card::before {
+  content: "";
+  position: absolute;
+  top: 30px;
+  bottom: 24px;
+  left: 0;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: var(--grip-green);
+}
+
+.grip-report__ai-summary-eyebrow-row {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.grip-report__ai-summary-eyebrow {
+  margin: 0;
+  color: var(--grip-muted);
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+.grip-report__ai-summary-pending {
+  color: var(--grip-muted);
+  font-size: 12px;
+}
+
+.grip-report__ai-summary-block h3 {
+  /* 墨色而不是绿色：结论本身要沉稳，不需要被高亮成营销标题 */
+  margin: 0 0 10px;
+  color: var(--grip-ink);
+  font-size: 19px;
+  line-height: 28px;
+  font-weight: 700;
+}
+
+.grip-report__ai-summary-block p {
+  margin: 0;
+  max-width: 62em;
+  color: var(--grip-text);
+  font-size: 15px;
+  line-height: 28px;
+}
+
+.grip-report__ai-summary-divider {
+  margin: 22px 0;
+  border-top: 1px solid var(--grip-line);
+}
+
+.grip-report__ai-summary-credit {
+  margin: 24px 0 0;
+  color: var(--grip-muted);
+  font-size: 11px;
+  line-height: 17px;
 }

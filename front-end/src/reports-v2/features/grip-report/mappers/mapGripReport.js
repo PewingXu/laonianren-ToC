@@ -492,13 +492,59 @@ function mapRedFlags(value) {
   return value.map((item) => textOr(item, '')).filter(Boolean).slice(0, 5);
 }
 
+/**
+ * 力-时间曲线。
+ *
+ * 点集必须 ≥4 个且 t 单调不减 —— 乱序的点画出来是折返的乱线。
+ * 任一侧不合规就丢掉那一侧；两侧都没有则整块不显示。
+ */
+function mapCurveSide(value) {
+  if (!isObject(value) || !Array.isArray(value.points) || value.points.length < 4) return null;
+
+  const points = [];
+  let previousT = -Infinity;
+  for (const point of value.points) {
+    if (!isObject(point)) return null;
+    const t = finiteOrNull(point.t);
+    const f = nonNegativeOrNull(point.f);
+    if (t === null || f === null || t < previousT) return null;
+    previousT = t;
+    points.push({ t, f });
+  }
+
+  const peak = isObject(value.peak) ? value.peak : null;
+  const peakT = peak ? finiteOrNull(peak.t) : null;
+  const peakF = peak ? nonNegativeOrNull(peak.f) : null;
+
+  return {
+    points,
+    peak: peakT !== null && peakF !== null ? { t: peakT, f: peakF } : null,
+    duration: positiveOrNull(value.duration),
+  };
+}
+
+function mapForceCurve(value) {
+  if (!isObject(value)) return null;
+
+  const left = mapCurveSide(value.left);
+  const right = mapCurveSide(value.right);
+  if (!left && !right) return null;
+
+  const maxForce = positiveOrNull(value.maxForce);
+  const maxDuration = positiveOrNull(value.maxDuration);
+  if (maxForce === null || maxDuration === null) return null;
+
+  return { left, right, maxForce, maxDuration, unit: textOr(value.unit, 'N') };
+}
+
 const SECONDARY_TONES = new Set(['green', 'blue', 'orange', 'purple']);
 
 /**
- * 二级指标。
+ * 二级指标。每项左右手各一个值。
  *
- * 数值项要求 value 是有限数；文本项（如「最有劲的手指」）用 isText 标记，
- * value 走字符串校验。任一项不合规就丢弃该项，不影响其余项。
+ * 数值项要求是有限数；文本项（如「最有劲的手指」）用 isText 标记走字符串校验。
+ * 单侧缺失是允许的（只测了一只手时很常见），组件会把缺的那侧显示成「未测」；
+ * 但两侧都拿不到就丢弃该项，不留一张空卡。
  */
 function mapSecondaryMetrics(value) {
   if (!Array.isArray(value)) return [];
@@ -511,15 +557,19 @@ function mapSecondaryMetrics(value) {
       if (!id || !label) return null;
 
       const isText = item.isText === true;
-      const numericValue = isText ? null : finiteOrNull(item.value);
-      const textValue = isText ? textOr(item.value, '') : '';
-      if (!isText && numericValue === null) return null;
-      if (isText && !textValue) return null;
+      const readSide = (side) => {
+        if (isText) return textOr(side, '') || null;
+        return finiteOrNull(side);
+      };
+      const left = readSide(item.left);
+      const right = readSide(item.right);
+      if (left === null && right === null) return null;
 
       return {
         id,
         label,
-        value: isText ? textValue : numericValue,
+        left,
+        right,
         isText,
         unit: textOr(item.unit, ''),
         note: textOr(item.note, ''),
@@ -697,6 +747,7 @@ export function mapGripReport(record, report) {
     trend: mapTrend(details.trend),
     fingerRegions: mapFingerRegions(leftData.fingers, rightData.fingers),
     secondaryMetrics: mapSecondaryMetrics(details.secondaryMetrics),
+    forceCurve: mapForceCurve(details.forceCurve),
     breakdown: mapBreakdown(details.breakdown),
     scoreSummary: mapScoreSummary(details.scoreSummary),
     redFlags: mapRedFlags(details.redFlags),

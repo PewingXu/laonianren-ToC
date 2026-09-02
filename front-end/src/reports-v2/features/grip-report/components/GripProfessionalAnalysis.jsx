@@ -1,4 +1,5 @@
 import { GripCvAnalysis } from './GripCvAnalysis';
+import { GripForceCurve } from './GripForceCurve';
 import { GripScoreBreakdown } from './GripScoreBreakdown';
 import { GripSixRegionForces } from './GripSixRegionForces';
 import { GripTrialsComparison } from './GripTrialsComparison';
@@ -24,7 +25,8 @@ export function GripProfessionalAnalysis({ details }) {
   const hasBreakdown = Array.isArray(details.breakdown) && details.breakdown.length > 0;
 
   const hasSide = hasCv || hasRegions;
-  if (!hasTrials && !hasSide && !hasBreakdown) return null;
+  const hasCurve = Boolean(details.forceCurve);
+  if (!hasTrials && !hasSide && !hasBreakdown && !hasCurve) return null;
 
   return (
     <section
@@ -32,6 +34,12 @@ export function GripProfessionalAnalysis({ details }) {
       aria-labelledby="grip-professional-analysis-title"
     >
       <h2 id="grip-professional-analysis-title">专业数据分析</h2>
+      {/* 曲线单独占一整行：横轴是时间，压到半宽会挤成一团 */}
+      {hasCurve ? (
+        <div className="grip-report__professional-full">
+          <GripForceCurve curve={details.forceCurve} />
+        </div>
+      ) : null}
       <div className="grip-report__professional-grid">
         {hasTrials ? <GripTrialsComparison trials={details.trials} /> : null}
         {hasSide ? (
