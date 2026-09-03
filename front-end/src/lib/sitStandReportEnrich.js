@@ -294,7 +294,14 @@ export function enrichSitStandReportData(reportData, { patientInfo } = {}) {
     status: speedBand(totalDuration),
     summary: {
       title: `起坐综合评分 ${scored.score} / ${MODULE_MAX_SCORE} 分`,
-      lead: scored.summary || '',
+      /*
+       * 不直接用 scored.summary —— 那是 toB 措辞，长这样：
+       *   「3次起坐总时长约 14s（核心 2/18 + 增强 5/7），起身速度偏慢或
+       *     动作质量下降，提示下肢功能下降风险需要重点关注。」
+       * 「核心 2/18 + 增强 5/7」是评分内部构成，「下肢功能下降风险」是
+       * 专业判读，都不该出现在给老人看的首屏结论里。
+       */
+      lead: buildLead({ totalDuration, avgDuration, stability, smoothness }),
     },
     findings: buildFindings({ totalDuration, avgDuration, stability, smoothness, m }),
     metrics,
@@ -327,6 +334,40 @@ export function enrichSitStandReportData(reportData, { patientInfo } = {}) {
       redFlags,
     },
   };
+}
+
+/**
+ * 首屏那段结论。说人话，不出现评分构成和专业判读词。
+ * 结构：多快 → 意味着什么 → 怎么办。
+ */
+function buildLead({ totalDuration, avgDuration, stability, smoothness }) {
+  // 与要点胶片保持 1 位小数，否则会出现结论写 4.67 秒、胶片写 4.7 秒
+  const each = avgDuration !== null ? `平均每次 ${round(avgDuration, 1)} 秒` : null;
+  const head = `连续起坐 3 次用了 ${round(totalDuration, 1)} 秒${each ? `，${each}` : ''}。`;
+
+  let body;
+  if (totalDuration <= 6) {
+    body = '起身又快又利索，腿上的劲很够，上下楼、从沙发起来都不费劲。';
+  } else if (totalDuration <= 7.2) {
+    body = '起身速度不错，日常上下楼、从椅子上起来都没问题。';
+  } else if (totalDuration <= 9) {
+    body = '起身比一般人慢一些，平时从矮沙发或马桶上起来可能要撑一下。';
+  } else if (totalDuration <= 12) {
+    body = '起身偏慢了，从矮的地方起来会比较吃力，建议开始练腿。';
+  } else {
+    body = '起身比较吃力，日常从沙发、马桶上起来要扶东西，摔倒的风险也会高一些，建议尽早开始练腿。';
+  }
+
+  let tail = '';
+  if (Number.isFinite(smoothness) && smoothness > 1.40) {
+    tail = '这次起身要晃身攒劲才起得来，起来的时候记得先扶稳。';
+  } else if (stability && stability.cv > 25) {
+    tail = '三次里一次比一次慢，说明连着做几下就累了，可以从少量多次开始练。';
+  } else if (totalDuration > 7.2) {
+    tail = '每天扶着椅子做几组起立坐下，一个月后再测一次看看。';
+  }
+
+  return `${head}${body}${tail}`;
 }
 
 /** 健康评估的 3 条说明。mapper 要求 1~3 条且每条非空。 */

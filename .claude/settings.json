@@ -15,7 +15,8 @@
       "Bash(unset ELECTRON_RUN_AS_NODE)",
       "Bash(ELECTRON_DISABLE_SECURITY_WARNINGS=1 ./node_modules/electron/dist/electron.exe ./_ptapp)",
       "Bash(grep -v '^$')",
-      "Bash(node /c/tmp/vss.mjs)"
+      "Bash(node /c/tmp/vss.mjs)",
+      "Bash(node /c/tmp/v2.mjs)"
     ]
   }
 }
