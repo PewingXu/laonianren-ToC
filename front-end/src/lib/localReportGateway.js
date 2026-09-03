@@ -18,6 +18,7 @@
 import { getRecord, getHistory } from './historyService';
 import { getRecordScores, getRankIncludingSelf, getCount } from './scoreRanking';
 import { enrichGripReportData, buildGripTrend } from './gripReportEnrich';
+import { enrichSitStandReportData } from './sitStandReportEnrich';
 
 /**
  * 全部详情报告类型。
@@ -118,6 +119,12 @@ function enrichReportData(type, reportData, context = {}) {
    */
   if (type === 'grip') {
     next = enrichGripReportData(next, { patientInfo: patient, trend });
+  }
+
+  /* 起坐：补 V3 评分、分档、参考线、周期稳定性。理由同握力 —— 放在网关里
+     才能让「历史记录」「测完即看」「CSV 调试台」三条路径拿到一致口径。 */
+  if (type === 'sitstand') {
+    next = enrichSitStandReportData(next, { patientInfo: patient });
   }
 
   if (!isObject(next.peerComparison)) {

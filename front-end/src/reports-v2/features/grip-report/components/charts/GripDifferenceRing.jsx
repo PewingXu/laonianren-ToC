@@ -34,7 +34,9 @@ export function GripDifferenceRing({ metric }) {
             <b>{metric.leftForce ?? '--'}<small>{metric.forceUnit}</small></b>
           </span>
           <span>
-            <Hand aria-hidden="true" />
+            {/* lucide 的 Hand 画的是左手，右手必须水平镜像，
+                否则两边是同一只手，看着像重复贴图 */}
+            <Hand aria-hidden="true" style={{ transform: 'scaleX(-1)' }} />
             <em>右手</em>
             <b>{metric.rightForce ?? '--'}<small>{metric.forceUnit}</small></b>
           </span>

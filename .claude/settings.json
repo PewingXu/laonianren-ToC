@@ -13,7 +13,9 @@
       "Bash(cp /c/tmp/print-test.mjs ./_pt.mjs)",
       "Bash(node ./_pt.mjs)",
       "Bash(unset ELECTRON_RUN_AS_NODE)",
-      "Bash(ELECTRON_DISABLE_SECURITY_WARNINGS=1 ./node_modules/electron/dist/electron.exe ./_ptapp)"
+      "Bash(ELECTRON_DISABLE_SECURITY_WARNINGS=1 ./node_modules/electron/dist/electron.exe ./_ptapp)",
+      "Bash(grep -v '^$')",
+      "Bash(node /c/tmp/vss.mjs)"
     ]
   }
 }
