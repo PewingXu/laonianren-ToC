@@ -224,7 +224,7 @@ function mapAdvice(value) {
 const FOOTER_FALLBACKS = {
   tip: '握力可作为肌肉力量的参考指标，建议结合专业意见安排复测。',
   disclaimer: '免责声明：本报告仅供参考，不能替代专业医疗诊断。如有不适，请及时就医。',
-  copyright: '© 矩侨工业。保留所有权利。',
+  copyright: '© 矩侨工业 保留所有权利。',
 };
 
 function mapFooter(value) {

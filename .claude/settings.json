@@ -7,7 +7,9 @@
       "Bash(node -e ' *)",
       "Bash(ls -d /c/Users/xpr12/Desktop/laonianren-express /mnt/c/Users/xpr12/Desktop/laonianren-express \"c:/Users/xpr12/Desktop/laonianren-express\" 2>&1 | head)",
       "Read(//mnt/c/Users/xpr12/Desktop/**)",
-      "Bash(node \"c:/tmp/perf.mjs\")"
+      "Bash(node \"c:/tmp/perf.mjs\")",
+      "Bash(grep -n \"buildFindings\\({\\\\|const redFlags = buildRedFlags\\\\|      redFlags,$\" gripReportEnrich.js)",
+      "Bash(node /c/tmp/vf.mjs)"
     ]
   }
 }

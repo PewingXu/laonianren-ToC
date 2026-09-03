@@ -701,6 +701,13 @@ export function enrichGripReportData(reportData, { patientInfo, trend } = {}) {
     help: kgTextToNewton(item.help),
   }));
 
+  // 红旗只算一次：首屏要点和「需要留意」列表共用同一份，避免两处措辞不一致
+  const redFlags = buildRedFlags({
+    maxN, thN, diffPct,
+    shakeCount: toNumber(mainHand?.shakeCount ?? mainHand?.shake_count, null),
+    scoredFlags: scored.redFlags || [],
+  });
+
   return {
     ...reportData,
     score: scorePercent,
@@ -711,7 +718,7 @@ export function enrichGripReportData(reportData, { patientInfo, trend } = {}) {
     },
     // maxN 用实测原值，不能拿 m.maxKg（已四舍五入到 0.1kg）再 ×9.8 回推 ——
     // 否则要点里写「257.7 N」而指标卡写「258.18 N」，同一页两个数字对不上
-    findings: buildFindings({ scored, maxN, thN, diffPct, profile }),
+    findings: buildFindings({ redFlags, maxN, thN, diffPct, profile }),
     metrics,
     evaluation: { ...(isObject(reportData.evaluation) ? reportData.evaluation : {}), ...evaluation },
     details: {
@@ -742,16 +749,59 @@ export function enrichGripReportData(reportData, { patientInfo, trend } = {}) {
         ratio: round(ratio, 2),
         note: kgTextToNewton(scored.note || ''),
       },
-      redFlags: (scored.redFlags || []).map(kgTextToNewton),
+      redFlags,
     },
   };
+}
+
+/**
+ * 「需要留意」列表。
+ *
+ * 为什么不直接用 scoreGrip 的 redFlags
+ * ---------------------------------------------------------------
+ * toB 那边的措辞是第三人称、面向专业人员的，例如
+ *   「男性最大握力低于 28kg 参考阈值」
+ * 读起来像在陈述「男性的握力标准」，而不是「您这次的握力偏低」——
+ * 主语歧义。而 toC 报告是直接给受检者本人看的，必须是「您的…」。
+ *
+ * 这里按同一批实测值重新生成第二人称文案，而不是用正则去改写 toB 的
+ * 字符串 —— 那样一旦 toB 调整措辞，改写规则就会静默失效。
+ * assessmentScoring.js 不动：它是 toB 共用的，改了会影响那边的报告。
+ *
+ * 判定阈值与 scoreGrip 保持一致（低于性别切点 / 差异 ≥20% / 抖动 >5 次），
+ * 所以两份报告标红的条目集合相同，只是说法不同。
+ *
+ * 兜底：如果 toB 未来新增了这里没覆盖的红旗类型，原样带过来并做 kg→N 换算，
+ * 宁可措辞生硬也不漏掉风险提示。
+ */
+function buildRedFlags({ maxN, thN, diffPct, shakeCount, scoredFlags }) {
+  const flags = [];
+
+  if (maxN !== null && thN !== null && maxN < thN) {
+    flags.push(`您的最大握力 ${round(maxN, 2)} N，低于同性别参考线 ${thN} N`);
+  }
+  if (diffPct !== null && diffPct >= 20) {
+    flags.push(`您两只手的握力相差约 ${diffPct}%，超出 20% 的常见范围`);
+  }
+  if (shakeCount !== null && shakeCount > 5) {
+    flags.push(`握的过程中抖动 ${shakeCount} 次，握得不够稳`);
+  }
+
+  // toB 若出现本函数未覆盖的红旗，补进来（去掉重复语义的那三类）
+  const covered = /最大握力|握力差异|抖动/;
+  for (const raw of scoredFlags) {
+    const text = kgTextToNewton(raw);
+    if (text && !covered.test(text)) flags.push(text);
+  }
+
+  return flags;
 }
 
 /**
  * 首屏三条要点。图标只能取 mapFindings 白名单里的四个：
  * thumbs-up / scale / heart / book-open。
  */
-function buildFindings({ scored, maxN, thN, diffPct, profile }) {
+function buildFindings({ redFlags, maxN, thN, diffPct, profile }) {
   const findings = [];
 
   findings.push({
@@ -784,11 +834,12 @@ function buildFindings({ scored, maxN, thN, diffPct, profile }) {
           ? '握到后面稍微松了一点，正常。'
           : '握到后面掉得比较快，耐力可以再练。',
     });
-  } else if (scored?.redFlags?.length) {
+  } else if (redFlags.length) {
+    // 用已改成第二人称的红旗，而不是 scored.redFlags（那是 toB 的第三人称措辞）
     findings.push({
       icon: 'book-open',
       title: '需要留意',
-      detail: scored.redFlags[0],
+      detail: redFlags[0],
     });
   }
 
