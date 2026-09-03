@@ -68,13 +68,23 @@
   }
 
   /* ─── 4. 与报告无关的一切都不进纸 ───
-     判据：既不包含报告根、本身也不是报告根 → 隐藏。
+     判据：既不包含报告根、本身也不是报告根、也不在报告根内部 → 隐藏。
      覆盖 body 直属挂件（Toast 之类 portal）+ #root 下前三层的外壳 chrome。
-     报告根内部的元素不会被这些选择器选中（层级都写死了），不用额外排除。 */
+
+     ⚠ 第三个 :not([data-print-root] *) 是必须的，别删。
+     打印根的层级随宿主不同：历史报告页 / 测完即看 / 调试台是
+       #root > div(page) > main[data-print-root]              ← 第 2 层
+     Dashboard 的综合报告弹层是
+       #root > div.dashboard-v2 > div.fixed > div[data-print-root]  ← 第 3 层
+     深度 3 那条选择器是为后者写的，但在前者身上会正好命中
+     main 的子元素 —— 也就是报告本体 .grip-report。它既没有
+     data-print-root 属性、也不包含该属性，前两个 :not() 都排除不掉，
+     于是整份报告被 display:none，导出来是一张空白页。
+     加上「不在报告根内部」这一条才能同时兼容两种深度。 */
   html[data-printing] body > *:not(:has([data-print-root])),
   html[data-printing] #root > *:not(:has([data-print-root])),
-  html[data-printing] #root > * > *:not(:has([data-print-root])):not([data-print-root]),
-  html[data-printing] #root > * > * > *:not(:has([data-print-root])):not([data-print-root]) {
+  html[data-printing] #root > * > *:not(:has([data-print-root])):not([data-print-root]):not([data-print-root] *),
+  html[data-printing] #root > * > * > *:not(:has([data-print-root])):not([data-print-root]):not([data-print-root] *) {
     display: none !important;
   }
 

@@ -9,7 +9,11 @@
       "Read(//mnt/c/Users/xpr12/Desktop/**)",
       "Bash(node \"c:/tmp/perf.mjs\")",
       "Bash(grep -n \"buildFindings\\({\\\\|const redFlags = buildRedFlags\\\\|      redFlags,$\" gripReportEnrich.js)",
-      "Bash(node /c/tmp/vf.mjs)"
+      "Bash(node /c/tmp/vf.mjs)",
+      "Bash(cp /c/tmp/print-test.mjs ./_pt.mjs)",
+      "Bash(node ./_pt.mjs)",
+      "Bash(unset ELECTRON_RUN_AS_NODE)",
+      "Bash(ELECTRON_DISABLE_SECURITY_WARNINGS=1 ./node_modules/electron/dist/electron.exe ./_ptapp)"
     ]
   }
 }
