@@ -19,7 +19,14 @@
       "Bash(node /c/tmp/v2.mjs)",
       "Bash(node /c/tmp/vf2.mjs)",
       "Bash(node /c/tmp/vf3.mjs)",
-      "Bash(../../venv/Scripts/python.exe -)"
+      "Bash(../../venv/Scripts/python.exe -)",
+      "Bash(grep -vE \"toFixed|round|Math\\\\.|getHandForceN|toNumber|\\\\?\\\\?|===|!==|const |let |//\")",
+      "Bash(printf '%s\\\\n' \"- [push 只推 xupeirong-develop]\\(feedback_push_only_own_branch.md\\) — merge / liuxinze-develop 不许碰，同事从 xupeirong-develop 合并\" >> \"C:C:\\\\Users\\\\Evan\\\\.claude\\\\projects\\\\d--juqiao-project-manage-laonianren-ToC\\\\memory\\\\MEMORY.md\" && echo \"=== MEMORY.md 现在 ===\" && cat \"C:C:\\\\Users\\\\Evan\\\\.claude\\\\projects\\\\d--juqiao-project-manage-laonianren-ToC\\\\memory\\\\MEMORY.md\")",
+      "Bash(awk '/result = _parse_json_response|parsed = _parse_json_response|data = _parse_json_response/{f=1} f{print NR\": \"$0} /return/{if\\(f\\){exit}}' llm_service.py)",
+      "Bash(../../venv/Scripts/python.exe -c \"import py_compile; py_compile.compile\\('llm_service.py', doraise=True\\); print\\('py_compile OK'\\)\")"
+    ],
+    "additionalDirectories": [
+      "C:\\C:\\Users\\Evan\\.claude\\projects\\d--juqiao-project-manage-laonianren-ToC\\memory"
     ]
   }
 }

@@ -468,37 +468,3 @@ function buildRedFlags({ totalDuration, m, stability, smoothness, scoredFlags })
 
   return flags;
 }
-
-/**
- * 导出给 AI 文案用的事实摘要。
- * 字段名与 prompts/sitstand_toc_prompt.py 的 build_sitstand_toc_user_prompt 逐一对应。
- */
-export function buildSitStandAiFacts(enriched) {
-  if (!isObject(enriched)) return null;
-
-  if (enriched.status === '数据异常') {
-    return {
-      is_valid: false,
-      invalid_reason: enriched.summary?.lead || '采集数据不足以反映真实起坐能力',
-    };
-  }
-
-  const ds = isObject(enriched.duration_stats) ? enriched.duration_stats : {};
-  const summary = enriched.details?.scoreSummary ?? null;
-
-  return {
-    is_valid: true,
-    total_seconds: toNumber(ds.total_duration, null),
-    average_seconds: toNumber(ds.avg_duration, null),
-    cycle_seconds: Array.isArray(ds.cycle_durations)
-      ? ds.cycle_durations.map((v) => toNumber(v, null)).filter((v) => v !== null)
-      : [],
-    grade: enriched.status ?? null,
-    score: summary?.total ?? null,
-    score_max: summary?.max ?? MODULE_MAX_SCORE,
-    left_right_ratio: toNumber(enriched.symmetry?.left_right_ratio, null),
-    smoothness: toNumber(enriched.pressure_stats?.force_curve_smoothness, null),
-    cycle_cv_percent: enriched.details?.cycleStability?.cvPercent ?? null,
-    red_flags: enriched.details?.redFlags ?? [],
-  };
-}

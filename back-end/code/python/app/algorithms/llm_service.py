@@ -11,6 +11,15 @@ from openai import OpenAI
 
 from llm_config import get_llm_config
 from prompts import ASSESSMENT_PROMPTS, append_common_user_rules
+
+# toC 文案各类型允许输出的顶层键 —— 与 reports-v2 各 mapper 的契约一一对应，
+# 多出来的键在返回前剔掉（见 generate_assessment_ai_report 末尾）。
+TOC_OUTPUT_KEYS = {
+    "grip_toc": {"aiSummary", "advice"},
+    "sitstand_toc": {"evaluation", "advice"},
+    "standing_toc": {"evaluation", "advice"},
+    "gait_toc": {"assessmentSummary", "scoreExplanation", "recommendations"},
+}
 from prompts.common_rules import render_score_context
 
 
@@ -109,6 +118,19 @@ def _build_messages(assessment_type: str, patient_info: dict, assessment_data: d
 
     system_prompt, prompt_builder = ASSESSMENT_PROMPTS[assessment_type]
     base_prompt = prompt_builder(patient_info, assessment_data)
+
+    # toC 文案（*_toc）不走下面两步：
+    #   - score_context 是 toB 的逐项得分明细，toC 的事实清单里已经把要给模型看的
+    #     数字精选好了，再塞一份会诱导它逐项点评
+    #   - COMMON_ASSESSMENT_USER_NOTE 是给 toB 专业判读写的：要求输出 overview /
+    #     clinical_suggestion 等字段、专业口吻、禁用「偏慢」这类口语。它和 toC
+    #     prompt 的「说人话、只出 evaluation+advice」直接矛盾。实测追加后模型会
+    #     多吐 6 个 toB 字段，文案里冒出「组间休息」「动作要求缓慢控制」这种康复术语。
+    if assessment_type.endswith("_toc"):
+        return [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": base_prompt},
+        ]
 
     # 把前端算好的系统评分（含各小项得分明细、红线）渲染进 prompt，
     # 让 AI 真正看到分数与扣分细则，使其文字与评分卡口径一致。
@@ -297,6 +319,18 @@ async def call_assessment_ai_report(
         raise
 
     result = _sanitize_ai_report(parsed)
+
+    # toC 输出只保留契约里的键。模型有时会习惯性多吐 data_quality / eval_level /
+    # overview 这类 toB 字段（即便 prompt 里没要求）——前端 mapper 会忽略它们，
+    # 但留着会让日志和调试响应变脏，也容易让人误以为 toC 走了 toB 的 prompt。
+    if assessment_type.endswith("_toc") and isinstance(result, dict):
+        allowed = TOC_OUTPUT_KEYS.get(assessment_type)
+        if allowed:
+            dropped = [k for k in result if k not in allowed]
+            result = {k: v for k, v in result.items() if k in allowed}
+            if dropped:
+                print(f"{tag} dropped non-contract keys: {dropped}", flush=True)
+
     print(f"{tag} [OK] done in {time.time() - t0:.1f}s, fields={list(result.keys())}\n", flush=True)
     return result
 
