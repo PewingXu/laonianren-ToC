@@ -16,7 +16,10 @@
       "Bash(ELECTRON_DISABLE_SECURITY_WARNINGS=1 ./node_modules/electron/dist/electron.exe ./_ptapp)",
       "Bash(grep -v '^$')",
       "Bash(node /c/tmp/vss.mjs)",
-      "Bash(node /c/tmp/v2.mjs)"
+      "Bash(node /c/tmp/v2.mjs)",
+      "Bash(node /c/tmp/vf2.mjs)",
+      "Bash(node /c/tmp/vf3.mjs)",
+      "Bash(../../venv/Scripts/python.exe -)"
     ]
   }
 }

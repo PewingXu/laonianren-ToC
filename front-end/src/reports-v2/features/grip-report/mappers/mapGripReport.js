@@ -42,6 +42,11 @@ function roundTo(value, precision) {
   return Math.round((value + Number.EPSILON) * factor) / factor;
 }
 
+/** 保留 null 的四舍五入。传感器浮点值（float32 长尾）必须过一遍再展示。 */
+function roundOrNull(value, precision) {
+  return value === null ? null : roundTo(value, precision);
+}
+
 function cloneValue(value) {
   if (Array.isArray(value)) return value.map(cloneValue);
   if (isObject(value)) {
@@ -712,15 +717,28 @@ export function mapGripReport(record, report) {
 
   const leftData = isObject(data.left) ? data.left : {};
   const rightData = isObject(data.right) ? data.right : {};
-  const left = nonNegativeOrNull(leftData.totalForce);
-  const right = nonNegativeOrNull(rightData.totalForce);
+  /*
+   * 必须四舍五入到 2 位再往下传。
+   *
+   * totalForce 是传感器算出来的 float32，取回来常常是
+   * 311.05999755859375 这种（float32 存 311.06 的产物）。
+   * nonNegativeOrNull 只做有效性校验、不规整数值，于是原值一路传到
+   * 指标卡和左右差异环上直接渲染，把卡片撑破。
+   *
+   * 规整放在这里而不是各展示组件里：forces 同时喂给最大握力卡、
+   * 左右差异环和 hero 要点，散在下游各改一遍迟早漏。
+   */
+  const left = roundOrNull(nonNegativeOrNull(leftData.totalForce), 2);
+  const right = roundOrNull(nonNegativeOrNull(rightData.totalForce), 2);
   const availableForces = [left, right].filter((value) => value !== null);
 
   if (availableForces.length === 0 || availableForces.every((value) => value === 0)) return null;
 
   const maximum = Math.max(...availableForces);
+  // 同样要规整：(|left-right|/max)*100 会产生 18.710216678454312 这种长尾，
+  // 它不只显示在卡片上，还会传给下游组件
   const relativeDifferencePercent = left !== null && right !== null && maximum > 0
-    ? (Math.abs(left - right) / maximum) * 100
+    ? roundTo((Math.abs(left - right) / maximum) * 100, 2)
     : null;
   const score = percentOrNull(data.score);
   const hasScore = score !== null;

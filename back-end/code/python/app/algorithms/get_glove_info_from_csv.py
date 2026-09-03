@@ -981,7 +981,9 @@ def _process_glove_data_core(input_csv, output_csv, hand_type):
         fingers.append({
             'name': part_names[pk],
             'key': pk,
-            'force': round(d['force'], 2),
+            # 同 totalForce：d['force'] 是 numpy 累加值，先转 python float 再 round，
+            # 否则六区域力量图上会出现 25.899999618530273 这种长尾
+            'force': round(float(d['force']), 2),
             'area': int(d['area']),
             'adc': d['adc'],
             'points': f"{d['nonzero_count']}/{d['total_count']}"
@@ -1021,7 +1023,11 @@ def _process_glove_data_core(input_csv, output_csv, hand_type):
         'gripDuration': round(float(grip_duration), 3),
         'timeAnalysis': time_analysis,
         'fingers': fingers,
-        'totalForce': round(total_force, 2),
+        # 必须先 float() 再 round：total_force 由 numpy 数组累加而来，若 dtype 是
+        # float32，round() 返回的仍是 np.float32，序列化时 float(np.float32(311.06))
+        # 会变成 311.05999755859375，前端直接把这串长尾渲染出来撑破卡片。
+        # 上面 peakInfo 各字段都是 round(float(...))，这里漏了，补齐口径。
+        'totalForce': round(float(total_force), 2),
         'totalArea': int(total_area),
         'times': sampled_times,
         'forceTimeSeries': force_time_series,
