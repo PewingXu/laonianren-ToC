@@ -10,8 +10,10 @@ ALGORITHMS_DIR = Path(__file__).resolve().parents[1] / "app" / "algorithms"
 sys.path.insert(0, str(ALGORITHMS_DIR))
 
 from OneStep_report import (
+    STANDING_COP_FILTER_HZ,
     calculate_cop_trajectories,
     find_standing_contact_indexes,
+    smooth_standing_cop,
 )
 
 
@@ -104,6 +106,78 @@ class StandingCopTrajectoryTest(unittest.TestCase):
     def test_a_foot_that_never_touches_selects_nothing(self):
         self.assertEqual(find_standing_contact_indexes([0] * 50), [])
         self.assertEqual(find_standing_contact_indexes([]), [])
+
+
+FPS = 42.0
+
+
+def cop_signal(sway_hz, sway_amplitude, jitter_amplitude, n=300, seed=3):
+    """慢速生理摆动 + 高频量化抖动。"""
+    rng = np.random.default_rng(seed)
+    t = np.arange(n) / FPS
+    sway = sway_amplitude * np.sin(2 * np.pi * sway_hz * t)
+    jitter = rng.normal(0, jitter_amplitude, n)
+    return [[float(a), float(b)] for a, b in zip(sway + jitter, sway + jitter)]
+
+
+def path_length(trajectory):
+    points = np.asarray(trajectory, dtype=float)
+    return float(np.hypot(*np.diff(points, axis=0).T).sum())
+
+
+class StandingCopFilterTest(unittest.TestCase):
+    def test_jitter_is_removed_but_the_sway_survives(self):
+        """低通要压掉抖动，同时保住 0.5Hz 的真实摆动幅度。"""
+        sway_amplitude = 1.0
+        clean = np.asarray(cop_signal(0.5, sway_amplitude, 0.0), dtype=float)
+        noisy = cop_signal(0.5, sway_amplitude, 0.15)
+        smoothed = np.asarray(smooth_standing_cop(noisy, fps=FPS), dtype=float)
+
+        # 轨迹长度是差分出来的，对抖动最敏感
+        self.assertLess(path_length(smoothed), path_length(noisy) * 0.35)
+        # 摆动幅度基本不动。用标准差而不是峰峰值：filtfilt 两端的填充瞬态
+        # 会让 ptp 偏大，衡量的是边缘而不是信号本身。
+        self.assertAlmostEqual(
+            float(smoothed[:, 0].std()), float(clean[:, 0].std()),
+            delta=sway_amplitude * 0.05,
+        )
+
+    def test_filtering_is_zero_phase(self):
+        """必须用 filtfilt：单向滤波的相移会直接污染速度类指标。"""
+        n = 300
+        t = np.arange(n) / FPS
+        sway = np.sin(2 * np.pi * 0.5 * t)
+        smoothed = np.asarray(
+            smooth_standing_cop([[float(v), float(v)] for v in sway], fps=FPS),
+            dtype=float,
+        )
+
+        # 峰值位置不应发生位移
+        self.assertEqual(int(np.argmax(smoothed[:, 0])), int(np.argmax(sway)))
+
+    def test_content_above_the_cutoff_is_attenuated(self):
+        fast = cop_signal(15.0, 1.0, 0.0)
+        smoothed = np.asarray(smooth_standing_cop(fast, fps=FPS), dtype=float)
+        original = np.asarray(fast, dtype=float)
+
+        # 只看内部：两端 filtfilt 的填充瞬态不代表滤波器的通带外抑制能力
+        interior = smoothed[30:-30, 0]
+        self.assertLess(float(np.ptp(interior)), float(np.ptp(original[:, 0])) * 0.05)
+
+    def test_short_or_invalid_input_is_returned_untouched(self):
+        """样本不足以做 filtfilt 边缘填充时原样返回，不能抛错。"""
+        short = [[1.0, 2.0], [1.5, 2.5], [2.0, 3.0]]
+        self.assertEqual(smooth_standing_cop(short, fps=FPS), short)
+        self.assertEqual(smooth_standing_cop([], fps=FPS), [])
+
+        usable = cop_signal(0.5, 1.0, 0.1)
+        # 截止频率高于奈奎斯特时无法构造滤波器，应原样返回
+        self.assertEqual(smooth_standing_cop(usable, fps=FPS, cutoff_hz=FPS), usable)
+        self.assertEqual(smooth_standing_cop(usable, fps=0), usable)
+
+    def test_cutoff_sits_below_nyquist_for_the_device_rate(self):
+        """42fps 下奈奎斯特是 21Hz；沿用文献的 10Hz 几乎滤不掉东西。"""
+        self.assertLess(STANDING_COP_FILTER_HZ, FPS / 2.0)
 
 
 if __name__ == "__main__":

@@ -8,6 +8,7 @@ import ast
 import numpy as np
 from matplotlib import image as mpimg
 from scipy.spatial.distance import euclidean, cdist
+from scipy.signal import butter, filtfilt
 # from tabulate import tabulate
 import seaborn as sns
 import matplotlib
@@ -391,7 +392,48 @@ def calculate_cop_corrected(pressure_grid, isRight):
     return cop_x, cop_y
 
 
-def calculate_cop_trajectories(df, left_curve, right_curve, threshold_ratio):
+# COP 低通滤波：轨迹长度和速度是对位置求差分得来的，会把逐帧抖动整个放大。
+# 本机 42fps、传感器间距 14mm，实测左脚帧间位移中位数 0.143 格 ≈ 2mm/帧，
+# 折算成 84mm/s 的"速度"，而这部分几乎全是量化噪声。
+#
+# 姿势图学惯例是 4 阶零相位 Butterworth（Schmid et al. 2002），但那套
+# 10Hz 截止是按 100Hz 采样定的；我们奈奎斯特只有 21Hz，10Hz 等于归一化
+# 0.48，基本不滤（实测速度仅从 131 降到 88 mm/s）。
+#
+# 改按本机信号的功率谱定截止：安静站立的 COP 能量集中在低频，实测干净一侧
+# 3Hz 以下占前后向 99%、左右向 94%。取 5Hz 既保住生理摆动，又能滤掉
+# 5~21Hz 那段噪声。必须零相位（filtfilt），单向滤波的相移会直接污染速度。
+STANDING_COP_FILTER_HZ = 5.0
+STANDING_COP_FILTER_ORDER = 4
+
+
+def smooth_standing_cop(trajectory, fps=42.0, cutoff_hz=STANDING_COP_FILTER_HZ,
+                        order=STANDING_COP_FILTER_ORDER):
+    """对 COP 轨迹做零相位低通。样本太少或截止频率不合法时原样返回。"""
+    points = np.asarray(trajectory, dtype=float)
+    if points.ndim != 2 or points.shape[0] < 2 or points.shape[1] < 2:
+        return trajectory
+    if not (fps > 0 and cutoff_hz > 0):
+        return trajectory
+
+    normalized_cutoff = cutoff_hz / (fps / 2.0)
+    if not 0 < normalized_cutoff < 1:
+        return trajectory
+
+    numerator, denominator = butter(order, normalized_cutoff, btype='low')
+    # filtfilt 双向各需要一段边缘数据做镜像填充，样本不够会直接抛错。
+    pad_length = 3 * (max(len(numerator), len(denominator)) - 1)
+    if points.shape[0] <= pad_length:
+        return trajectory
+
+    smoothed = np.column_stack([
+        filtfilt(numerator, denominator, points[:, 0]),
+        filtfilt(numerator, denominator, points[:, 1]),
+    ])
+    return [[float(x), float(y)] for x, y in smoothed]
+
+
+def calculate_cop_trajectories(df, left_curve, right_curve, threshold_ratio, fps=42.0):
     """静止站立的左右脚 COP 轨迹，取整段着地期。
 
     threshold_ratio 保留在签名里只为兼容既有调用方，取窗已改用
@@ -412,7 +454,12 @@ def calculate_cop_trajectories(df, left_curve, right_curve, threshold_ratio):
                 # 该帧这只脚没有压力：跳过这一帧即可，不该让整条轨迹作废。
                 continue
             sink.append([cop_x, cop_y])
-    return left_serial_matrix_cop, right_serial_matrix_cop
+    # 在源头统一滤波：画出来的轨迹与所有下游统计（cop_time_series、
+    # 置信椭圆）用的是同一条信号，图和数字不会互相矛盾。
+    return (
+        smooth_standing_cop(left_serial_matrix_cop, fps=fps),
+        smooth_standing_cop(right_serial_matrix_cop, fps=fps),
+    )
 
 
 # =============== 性能优化2：OpenCV 连通域替代 DFS（核心加速） ===============
@@ -2392,7 +2439,7 @@ def cal_cop_fromData(data_array, threshold_ratio=0.8, fps=42, r_radius=0.1, time
     left_curve, right_curve = extract_pressure_curves(data_array)
 
     # COP轨迹
-    left_cop, right_cop = calculate_cop_trajectories(df, left_curve, right_curve, threshold_ratio)
+    left_cop, right_cop = calculate_cop_trajectories(df, left_curve, right_curve, threshold_ratio, fps=fps)
 
     # ✅ 足弓指标（使用总压力峰值帧）
     arch_results = calculate_complete_arch_features(data_array, left_curve, right_curve, False)

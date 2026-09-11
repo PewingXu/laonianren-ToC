@@ -97,7 +97,7 @@ def generate_standing_report(data_array, fps=42, threshold_ratio=0.8):
         )
         left_curve, right_curve = extract_pressure_curves(processed_data)
         left_cop, right_cop = calculate_cop_trajectories(
-            df, left_curve, right_curve, threshold_ratio
+            df, left_curve, right_curve, threshold_ratio, fps=fps
         )
 
         # 计算置信椭圆参数（不画图，只取数值）
