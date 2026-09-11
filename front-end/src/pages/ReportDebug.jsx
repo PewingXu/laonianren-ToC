@@ -143,6 +143,7 @@ export default function ReportDebug() {
   const [patient, setPatient] = useState({ name: '调试用户', gender: '男', age: '70', weight: '60' });
   const [region, setRegion] = useState(() => getDeviceRegion());
   const [reports, setReports] = useState({});          // { grip: reportData, ... }
+  const [assessmentIds, setAssessmentIds] = useState({});
   const [sources, setSources] = useState({});          // { grip: '张三_握力.csv · 1024 帧' }
   const [view, setView] = useState('overview');        // 'overview' | REPORT_TYPES[n]
   const [busy, setBusy] = useState('');
@@ -172,10 +173,11 @@ export default function ReportDebug() {
    */
   const gateway = useMemo(() => createMemoryRecordGateway({
     reports,
+    assessmentIds,
     patient,
     institution: `${REGION_LABEL[region] || ''}·调试`,
     fallbackId: DEBUG_RECORD_ID,
-  }), [reports, patient, region]);
+  }), [reports, assessmentIds, patient, region]);
 
   const loadedTypes = REPORT_TYPES.filter((t) => isObject(reports[t]));
 
@@ -225,6 +227,9 @@ export default function ReportDebug() {
     if (gotTypes.length) {
       setReports((prev) => ({ ...prev, ...nextReports }));
       setSources((prev) => ({ ...prev, ...nextSources }));
+      setAssessmentIds((prev) => Object.fromEntries(
+        Object.entries(prev).filter(([type]) => !gotTypes.includes(type)),
+      ));
       // 只导入了一项时直接切到那一项，省一次点击
       if (gotTypes.length === 1) setView(gotTypes[0]);
     }
@@ -256,6 +261,9 @@ export default function ReportDebug() {
     if (gotTypes.length) {
       setReports((prev) => ({ ...prev, ...nextReports }));
       setSources((prev) => ({ ...prev, ...nextSources }));
+      setAssessmentIds((prev) => Object.fromEntries(
+        Object.entries(prev).filter(([type]) => !gotTypes.includes(type)),
+      ));
       if (gotTypes.length === 1) setView(gotTypes[0]);
     }
   }, [view, appendLog]);
@@ -269,6 +277,7 @@ export default function ReportDebug() {
       if (!record) throw new Error('记录不存在');
       const next = {};
       const nextSrc = {};
+      const nextAssessmentIds = {};
       for (const type of REPORT_TYPES) {
         const a = record.assessments?.[type];
         const rd = isObject(a?.report?.reportData) ? a.report.reportData
@@ -276,11 +285,18 @@ export default function ReportDebug() {
         if (rd) {
           next[type] = rd;
           nextSrc[type] = `历史记录 ${record.patientName || ''}`;
+          if (
+            (typeof a?.assessmentId === 'string' && a.assessmentId.trim())
+            || (typeof a?.assessmentId === 'number' && Number.isFinite(a.assessmentId))
+          ) {
+            nextAssessmentIds[type] = String(a.assessmentId);
+          }
         }
       }
       if (!Object.keys(next).length) throw new Error('这条记录里没有四项报告数据');
       setReports(next);
       setSources(nextSrc);
+      setAssessmentIds(nextAssessmentIds);
       setPatient({
         name: record.patientName || '调试用户',
         gender: record.patientGender || '男',
@@ -312,6 +328,7 @@ export default function ReportDebug() {
   const handleClear = useCallback(() => {
     setReports({});
     setSources({});
+    setAssessmentIds({});
     setView('overview');
     appendLog('已清空所有槽位', 'info');
   }, [appendLog]);

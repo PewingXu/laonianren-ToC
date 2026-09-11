@@ -8,6 +8,7 @@ import {
   MODULE_WEIGHT_SCORE,
   COMPREHENSIVE_MAX_SCORE,
 } from '../../lib/assessmentScoring';
+import { prepareAssessmentsForScoring } from '../../lib/reportScoringAdapter';
 
 /**
  * 综合评估报告组件
@@ -264,7 +265,10 @@ export default function ComprehensiveReport({ record, onClose }) {
 
   // 综合评分评估
   const comprehensiveScore = useMemo(
-    () => buildComprehensiveScoreResult(assessments, patientInfo),
+    () => buildComprehensiveScoreResult(
+      prepareAssessmentsForScoring(assessments),
+      patientInfo,
+    ),
     [assessments, patientInfo],
   );
   const itemScoreMap = useMemo(

@@ -21,6 +21,8 @@ const { callAlgorithm } = require('../algorithms');
 const { decryptStr } = require('../util/aes_ecb');
 const module2 = require('../util/aes_ecb')
 const multer = require('multer')
+const sqlite3 = require('sqlite3').verbose()
+const { GAIT_FOOT_KEYS, extractGaitBoardSeries } = require('./gaitRows')
 
 
 console.log('userData from env:', typeof process.env.isPackaged);
@@ -1227,6 +1229,62 @@ const { db } = initDb(file, dbPath)
 currentDb = db
 ensureMatrixNameColumn(currentDb)
 
+function queryGaitRows(db, assessmentId, sampleType) {
+  return new Promise((resolve, reject) => {
+    db.all(
+      'select * from matrix WHERE assessment_id=? AND sample_type=? ORDER BY timestamp ASC, id ASC',
+      [assessmentId, sampleType],
+      (err, rows) => {
+        if (err) return reject(err)
+        resolve(rows || [])
+      }
+    )
+  })
+}
+
+async function queryReadOnlyGaitDb(dbFile, assessmentId, sampleType) {
+  const db = await new Promise((resolve, reject) => {
+    const opened = new sqlite3.Database(dbFile, sqlite3.OPEN_READONLY, (err) => {
+      if (err) return reject(err)
+      resolve(opened)
+    })
+  })
+
+  try {
+    return await queryGaitRows(db, assessmentId, sampleType)
+  } finally {
+    await new Promise((resolve) => db.close(() => resolve()))
+  }
+}
+
+/**
+ * 开发版页面历史保存在 Electron userData，而实时采集默认写在仓库开发库。
+ * 用精确 assessment_id 查询两个位置，避免因开发/安装版切换而丢失原始步态。
+ */
+async function getGaitRowsByAssessmentId(assessmentId, sampleType) {
+  const activeRows = await queryGaitRows(currentDb, assessmentId, sampleType)
+  if (activeRows.length) return activeRows
+
+  if (!userDataDir || typeof file !== 'string' || !/^[a-zA-Z0-9_-]+$/.test(file)) {
+    return []
+  }
+
+  const persistedDb = path.join(userDataDir, 'db', `${file}.db`)
+  const activeDb = path.resolve(dbPath, `${file}.db`)
+  if (path.resolve(persistedDb) === activeDb || !fs.existsSync(persistedDb)) return []
+
+  try {
+    const rows = await queryReadOnlyGaitDb(persistedDb, assessmentId, sampleType)
+    if (rows.length) {
+      console.log('[getFootPdf] restored gait source from userData by assessment_id:', assessmentId)
+    }
+    return rows
+  } catch (err) {
+    console.warn('[getFootPdf] userData gait lookup failed:', err.message)
+    return []
+  }
+}
+
 console.log(__dirname, dbPath, '__dirname')
 
 app.get('/', (req, res) => {
@@ -1821,16 +1879,7 @@ app.post('/getFootPdf', async (req, res) => {
     }
 
     const sampleTypeRaw = '5'
-    const rows = await new Promise((resolve, reject) => {
-      currentDb.all(
-        "select * from matrix WHERE assessment_id=? AND sample_type=?",
-        [assessmentId, sampleTypeRaw],
-        (err, data) => {
-          if (err) return reject(err)
-          resolve(data || [])
-        }
-      )
-    })
+    const rows = await getGaitRowsByAssessmentId(assessmentId, sampleTypeRaw)
 
     if (!rows || !rows.length) {
       res.json(new HttpResult(1, {}, 'no data for assessment_id'))
@@ -1853,62 +1902,22 @@ app.post('/getFootPdf', async (req, res) => {
       return `${d.getFullYear()}/${pad(d.getMonth() + 1)}/${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}:${pad(d.getMilliseconds(), 3)}`
     }
 
-    const data1 = []
-    const data2 = []
-    const data3 = []
-    const data4 = []
-    const t1 = []
-    const t2 = []
-    const t3 = []
-    const t4 = []
+    const {
+      boardData: rawBoardData,
+      boardTimes: rawBoardTimes,
+      rejectedFrames,
+      rejectedTimestamps,
+    } = extractGaitBoardSeries(rows)
+    const boardTimes = rawBoardTimes.map((series) => series.map(formatTimestamp))
+    const frameLengths = rawBoardData.map((series) => series.length)
 
-    const requiredKeys = ['foot1', 'foot2', 'foot3', 'foot4']
-    const gaitSeenStamps = {}  // 步态数据去重用
-    rows.forEach((row) => {
-      let dataObj = {}
-      try {
-        dataObj = JSON.parse(row.data || '{}')
-      } catch {}
-      // 基于 stamp 去重：检查任一 foot 的 stamp 是否已见过
-      let isDuplicate = false
-      for (const fk of requiredKeys) {
-        const stamp = dataObj[fk]?.stamp
-        if (stamp !== undefined && stamp !== null) {
-          if (!gaitSeenStamps[fk]) gaitSeenStamps[fk] = new Set()
-          if (gaitSeenStamps[fk].has(stamp)) { isDuplicate = true; break }
-        }
-      }
-      if (isDuplicate) return  // 重复帧，跳过
-      // 记录 stamp
-      for (const fk of requiredKeys) {
-        const stamp = dataObj[fk]?.stamp
-        if (stamp !== undefined && stamp !== null) {
-          if (!gaitSeenStamps[fk]) gaitSeenStamps[fk] = new Set()
-          gaitSeenStamps[fk].add(stamp)
-        }
-      }
-      const v1 = dataObj.foot1?.arr || dataObj.foot1
-      const v2 = dataObj.foot2?.arr || dataObj.foot2
-      const v3 = dataObj.foot3?.arr || dataObj.foot3
-      const v4 = dataObj.foot4?.arr || dataObj.foot4
-      if (
-        Array.isArray(v1) && Array.isArray(v2) &&
-        Array.isArray(v3) && Array.isArray(v4)
-      ) {
-        data1.push(v1)
-        data2.push(v2)
-        data3.push(v3)
-        data4.push(v4)
-        const ts = formatTimestamp(row.timestamp)
-        t1.push(ts)
-        t2.push(ts)
-        t3.push(ts)
-        t4.push(ts)
-      }
-    })
-
-    if (!data1.length || !data2.length || !data3.length || !data4.length) {
-      res.json(new HttpResult(1, { keys: requiredKeys }, 'missing foot data'))
+    if (frameLengths.some((length) => length === 0)) {
+      res.json(new HttpResult(1, {
+        keys: GAIT_FOOT_KEYS,
+        frameLengths,
+        rejectedFrames,
+        rejectedTimestamps,
+      }, 'missing foot data'))
       return
     }
 
@@ -1942,14 +1951,12 @@ app.post('/getFootPdf', async (req, res) => {
     // }
 
     console.log('[getFootPdf] frame lengths:', {
-      d1: data1.length,
-      d2: data2.length,
-      d3: data3.length,
-      d4: data4.length,
-      t1: t1.length,
-      t2: t2.length,
-      t3: t3.length,
-      t4: t4.length
+      foot1: frameLengths[0],
+      foot2: frameLengths[1],
+      foot3: frameLengths[2],
+      foot4: frameLengths[3],
+      rejectedFrames,
+      rejectedTimestamps,
     })
 
     let renderData = null
@@ -1958,13 +1965,7 @@ app.post('/getFootPdf', async (req, res) => {
     try {
       // 将 4 路数据转换为 Python 算法需要的格式
       // board_data: 每块板的数据是 "[v0,v1,...,v4095]" 格式的字符串数组
-      const boardData = [
-        data1.map(arr => JSON.stringify(arr)),
-        data2.map(arr => JSON.stringify(arr)),
-        data3.map(arr => JSON.stringify(arr)),
-        data4.map(arr => JSON.stringify(arr)),
-      ]
-      const boardTimes = [t1, t2, t3, t4]
+      const boardData = rawBoardData.map((series) => series.map((arr) => JSON.stringify(arr)))
 
       console.log('[getFootPdf] 调用 Python 步道算法...')
       renderData = await callAlgorithm('generate_gait_render_report', {

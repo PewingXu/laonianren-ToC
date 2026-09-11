@@ -1,5 +1,7 @@
 import {
+  CircleAlert,
   CircleCheckBig,
+  CircleHelp,
   Heart,
   Ruler,
   Scale,
@@ -16,8 +18,18 @@ const NOTE_ICONS = {
   direction: Target,
 };
 
+function statusAppearance(status) {
+  const value = typeof status === 'string' ? status : '';
+  if (/数据不足|暂无/.test(value)) return { Icon: CircleHelp, tone: 'muted' };
+  if (/样本有限|需关注|较高|不对称|异常/.test(value)) {
+    return { Icon: CircleAlert, tone: 'attention' };
+  }
+  if (/参考/.test(value)) return { Icon: CircleHelp, tone: 'reference' };
+  return { Icon: CircleCheckBig, tone: 'positive' };
+}
+
 function displayValue(value, fallback = '--') {
-  return value === null ? fallback : value;
+  return value === null || value === undefined ? fallback : value;
 }
 
 function ProgressTrack({ value }) {
@@ -29,24 +41,36 @@ function ProgressTrack({ value }) {
 }
 
 function StabilityMetrics({ ability }) {
-  const metrics = [
+  let metricLabel = '身体晃动范围';
+  let unit = 'cm';
+  let scaleMax = ability.swayScaleMaxCm;
+  let metrics = [
     ['前后晃动', ability.foreAftSwayCm, ability.foreAftProgressPercent],
     ['左右晃动', ability.lateralSwayCm, ability.lateralProgressPercent],
   ];
+
+  if (ability.metricMode === 'stepVariability') {
+    metricLabel = '相邻落脚变异系数';
+    unit = '%';
+    scaleMax = ability.variabilityScaleMax;
+    metrics = [
+      ['步时变异', ability.stepTimeCvPercent, ability.stepTimeProgressPercent],
+      ['落脚间距变异', ability.stepDistanceCvPercent, ability.stepDistanceProgressPercent],
+    ];
+  }
+  const hasMeasuredValue = metrics.some(([, value]) => value !== null);
 
   return (
     <div className="gait-report__ability-visual">
       <div className="gait-report__ability-image-wrap">
         <img
           src={gaitReportImages.stability}
-          alt={ability.foreAftSwayCm === null && ability.lateralSwayCm === null
-            ? '身体晃动范围数据不足'
-            : '行走稳定性示意图'}
+          alt={hasMeasuredValue ? '行走落脚一致性示意图' : '行走稳定性数据不足'}
         />
       </div>
       <div className="gait-report__ability-metrics">
         <p className="gait-report__ability-metric-label">
-          身体晃动范围 <span>(越小越好)</span>
+          {metricLabel} <span>(越小越一致)</span>
         </p>
         {metrics.map(([label, value, progress]) => (
           <div className="gait-report__ability-measure" key={label}>
@@ -54,13 +78,13 @@ function StabilityMetrics({ ability }) {
               <span>{label}</span>
               <strong>
                 {displayValue(value)}
-                {value === null ? null : <small>cm</small>}
+                {value === null ? null : <small>{unit}</small>}
               </strong>
             </div>
             <ProgressTrack value={progress} />
             <p className="gait-report__ability-range">
               <span>0</span>
-              <span>{ability.swayScaleMaxCm === null ? '--' : `${ability.swayScaleMaxCm}cm`}</span>
+              <span>{scaleMax === null ? '--' : `${scaleMax}${unit}`}</span>
             </p>
           </div>
         ))}
@@ -77,17 +101,17 @@ function CoordinationMetrics({ ability }) {
       <div className="gait-report__ability-image-wrap">
         <img
           src={gaitReportImages.coordination}
-          alt={hasLoadData ? '足底压力分布分析图' : '双脚受力比例数据不足'}
+          alt={hasLoadData ? '足底压力分布分析图' : '累计足底负荷占比数据不足'}
         />
       </div>
       <div className="gait-report__ability-metrics">
-        <p className="gait-report__ability-metric-label">双脚受力比例</p>
+        <p className="gait-report__ability-metric-label">累计足底负荷占比</p>
         <div className="gait-report__ability-load-row gait-report__ability-load-row--left">
-          <span>左脚承重</span>
+          <span>左脚占比</span>
           <strong>{hasLoadData ? `${ability.leftLoadPercent}%` : '--'}</strong>
         </div>
         <div className="gait-report__ability-load-row gait-report__ability-load-row--right">
-          <span>右脚承重</span>
+          <span>右脚占比</span>
           <strong>{hasLoadData ? `${ability.rightLoadPercent}%` : '--'}</strong>
         </div>
         <div className="gait-report__load-balance" aria-hidden="true">
@@ -121,8 +145,14 @@ function RhythmMeasure({ icon: Icon, label, value, unit, range, bandClassName })
         {range === null ? null : <i className={bandClassName} />}
       </div>
       <p className="gait-report__ability-range">
-        <span>{range?.min ?? '--'}</span>
-        <span>{range?.max ?? '--'}</span>
+        {range === null || range === undefined ? (
+          <span>暂无参考范围</span>
+        ) : (
+          <>
+            <span>{range.min}</span>
+            <span>{range.max}</span>
+          </>
+        )}
       </p>
     </div>
   );
@@ -135,7 +165,7 @@ function RhythmMetrics({ ability }) {
         <img
           src={gaitReportImages.rhythm}
           alt={ability.cadenceStepsPerMinute === null && ability.stepLengthM === null
-            ? '步频与步幅数据不足'
+            ? '步频与同脚步幅数据不足'
             : '步频分析示意图'}
         />
       </div>
@@ -150,9 +180,9 @@ function RhythmMetrics({ ability }) {
         />
         <RhythmMeasure
           icon={Ruler}
-          label="步幅"
+          label="同脚步幅"
           value={ability.stepLengthM}
-          unit="米"
+          unit="m"
           range={ability.stepLengthRange}
           bandClassName="gait-report__rhythm-band--step"
         />
@@ -173,7 +203,7 @@ function DirectionMetrics({ ability }) {
       <div className="gait-report__ability-metrics">
         <div className="gait-report__direction-measure">
           <p className="gait-report__ability-metric-label">
-            路线偏移 <span>(越小越好)</span>
+            步迹偏移（均方根） <span>(越小越接近路线)</span>
           </p>
           <strong>
             {displayValue(ability.pathDeviationCm)}
@@ -188,9 +218,16 @@ function DirectionMetrics({ ability }) {
           </p>
         </div>
         <div className="gait-report__direction-sway">
-          <p>身体摆动</p>
-          <strong>{ability.bodySway}</strong>
-          <span>{ability.bodySwayDetail}</span>
+          <p>最大步迹偏移</p>
+          <strong>
+            {displayValue(ability.maxPathDeviationCm)}
+            {ability.maxPathDeviationCm === null ? null : <small>cm</small>}
+          </strong>
+          <span>
+            {ability.validStepCount === null
+              ? '有效落脚数据不足'
+              : `${ability.validStepCount} 次有效落脚`}
+          </span>
         </div>
       </div>
     </div>
@@ -206,6 +243,7 @@ function AbilityMetrics({ ability }) {
 
 export function GaitAbilityCard({ ability }) {
   const NoteIcon = NOTE_ICONS[ability.id] || ShieldCheck;
+  const { Icon: StatusIcon, tone: statusTone } = statusAppearance(ability.status);
   const subtitleId = `gait-ability-${ability.id}-subtitle`;
   const noteId = `gait-ability-${ability.id}-note`;
 
@@ -223,8 +261,8 @@ export function GaitAbilityCard({ ability }) {
           </span>
           <h4>{ability.title}</h4>
         </div>
-        <span className="gait-report__ability-status">
-          <CircleCheckBig aria-hidden="true" />
+        <span className={`gait-report__ability-status gait-report__ability-status--${statusTone}`}>
+          <StatusIcon aria-hidden="true" />
           {ability.status}
         </span>
       </div>

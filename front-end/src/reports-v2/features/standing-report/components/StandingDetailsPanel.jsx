@@ -1,9 +1,11 @@
 import {
   CheckCircle2,
+  Crosshair,
   Footprints,
   Gauge,
   Info,
 } from 'lucide-react';
+import { copTrajectoryPath } from './standingCopVisuals';
 
 const ARCH_SCALE_MIN = 0.15;
 const ARCH_SCALE_MAX = 0.31;
@@ -26,73 +28,36 @@ function formatPercent(value) {
   return isAvailable(value) ? `${formatNumber(value)}%` : '--';
 }
 
-function pathFor(points) {
-  if (points.length === 0) return '';
-
-  const allX = points.map((point) => point.x);
-  const allY = points.map((point) => point.y);
-  const minX = Math.min(...allX);
-  const maxX = Math.max(...allX);
-  const minY = Math.min(...allY);
-  const maxY = Math.max(...allY);
-  const xRange = maxX - minX || 1;
-  const yRange = maxY - minY || 1;
-
-  const mapped = points.map((point) => ({
-    x: 145 + ((point.x - minX) / xRange) * 130,
-    y: 145 + ((point.y - minY) / yRange) * 130,
-  }));
-
-  if (mapped.length === 1) {
-    return `M${mapped[0].x.toFixed(1)} ${mapped[0].y.toFixed(1)}`;
-  }
-
-  return mapped.slice(0, -1).reduce((path, point, index) => {
-    const previous = mapped[index - 1] || point;
-    const next = mapped[index + 1];
-    const following = mapped[index + 2] || next;
-    const controlOne = {
-      x: point.x + (next.x - previous.x) / 6,
-      y: point.y + (next.y - previous.y) / 6,
-    };
-    const controlTwo = {
-      x: next.x - (following.x - point.x) / 6,
-      y: next.y - (following.y - point.y) / 6,
-    };
-
-    return `${path} C${controlOne.x.toFixed(1)} ${controlOne.y.toFixed(1)} ${controlTwo.x.toFixed(1)} ${controlTwo.y.toFixed(1)} ${next.x.toFixed(1)} ${next.y.toFixed(1)}`;
-  }, `M${mapped[0].x.toFixed(1)} ${mapped[0].y.toFixed(1)}`);
-}
 
 function copDirectionSummary(cop) {
   if (!isAvailable(cop.lateralRange) || !isAvailable(cop.longitudinalRange)) return null;
+  const subject = cop.metricScope === 'representative-foot' ? '代表侧单足 COP' : '整体 COP';
   if (cop.longitudinalRange > cop.lateralRange) {
-    return '本次站立时前后晃动大于左右晃动。';
+    return `${subject} 的前后摆动大于左右摆动。`;
   }
   if (cop.lateralRange > cop.longitudinalRange) {
-    return '本次站立时左右晃动大于前后晃动。';
+    return `${subject} 的左右摆动大于前后摆动。`;
   }
-  return '本次站立时前后与左右晃动范围相同。';
+  return `${subject} 的前后与左右摆动范围相同。`;
 }
 
 function dominantPressureSummary(pressure) {
-  const regionTotals = REGION_META.map((region) => {
-    const values = [
-      pressure.leftRegions[region.key],
-      pressure.rightRegions[region.key],
-    ].filter(isAvailable);
-    if (values.length === 0) return null;
-    return {
-      ...region,
-      average: values.reduce((total, value) => total + value, 0) / values.length,
-    };
-  }).filter(Boolean);
+  const summaryForSide = (regions, label) => {
+    const availableRegions = REGION_META
+      .map((region) => ({ ...region, value: regions[region.key] }))
+      .filter((region) => isAvailable(region.value));
+    if (availableRegions.length === 0) return null;
+    const dominant = availableRegions.reduce((current, region) => (
+      region.value > current.value ? region : current
+    ));
+    return `${label}压力占比最高的是${dominant.summary}区域`;
+  };
+  const summaries = [
+    summaryForSide(pressure.leftRegions, '左脚'),
+    summaryForSide(pressure.rightRegions, '右脚'),
+  ].filter(Boolean);
 
-  if (regionTotals.length === 0) return null;
-  const dominant = regionTotals.reduce((current, region) => (
-    region.average > current.average ? region : current
-  ));
-  return `双脚压力主要集中在${dominant.summary}区域。`;
+  return summaries.length ? `${summaries.join('；')}。` : null;
 }
 
 function archMarkerPosition(index) {
@@ -103,27 +68,14 @@ function archMarkerPosition(index) {
 
 function archSummary(arch) {
   const typeParts = [];
-  if (arch.leftType === '正常' && arch.rightType === '正常') {
-    typeParts.push('双脚足弓均处于正常范围');
+  if (arch.leftType === '正常足弓' && arch.rightType === '正常足弓') {
+    typeParts.push('双脚足弓正常');
   } else {
     if (arch.leftType && arch.leftType !== '数据不足') {
-      typeParts.push(`左足足弓状态${arch.leftType}`);
+      typeParts.push(`左足为${arch.leftType}`);
     }
     if (arch.rightType && arch.rightType !== '数据不足') {
-      typeParts.push(`右足足弓状态${arch.rightType}`);
-    }
-  }
-
-  const leftArea = arch.leftContactArea;
-  const rightArea = arch.rightContactArea;
-  if (isAvailable(leftArea) && isAvailable(rightArea)) {
-    const difference = Number(Math.abs(leftArea - rightArea).toFixed(2));
-    if (difference === 0) {
-      typeParts.push('双脚接触面积相同');
-    } else {
-      const largerSide = leftArea > rightArea ? '左足' : '右足';
-      const smallerSide = leftArea > rightArea ? '右足' : '左足';
-      typeParts.push(`${largerSide}接触面积比${smallerSide}大 ${formatNumber(difference)} cm²`);
+      typeParts.push(`右足为${arch.rightType}`);
     }
   }
 
@@ -202,14 +154,29 @@ function CopMetric({ label, value, unit }) {
 
 function CopAnalysis({ cop }) {
   const trajectory = Array.isArray(cop.trajectory) ? cop.trajectory : [];
-  const trajectoryPath = pathFor(trajectory);
+  const trajectoryPath = copTrajectoryPath(trajectory);
   const hasData = trajectory.length > 0 || [
     cop.pathLength,
     cop.area,
     cop.lateralRange,
     cop.longitudinalRange,
+    cop.averageVelocity,
+    cop.maxDisplacement,
+    cop.rmsDisplacement,
+    cop.majorAxis,
+    cop.minorAxis,
   ].some(isAvailable);
   const directionSummary = copDirectionSummary(cop);
+  const usesRepresentativeFoot = cop.metricScope === 'representative-foot';
+  const metricSideLabel = cop.metricSide === 'left'
+    ? '左足'
+    : (cop.metricSide === 'right' ? '右足' : null);
+  const metricPrefix = usesRepresentativeFoot
+    ? `${metricSideLabel || '代表侧单足'} COP`
+    : '整体 COP';
+  const metricScopeDescription = metricSideLabel
+    ? `算法代表侧（${metricSideLabel}）`
+    : '算法代表侧单足';
 
   return (
     <article
@@ -221,45 +188,116 @@ function CopAnalysis({ cop }) {
         icon={CopTargetIcon}
         tone="green"
         title="站立稳定轨迹"
-        subtitle="压力中心（COP）在站立过程中的移动情况"
+        subtitle={usesRepresentativeFoot
+          ? `双足轨迹，统计取${metricScopeDescription}`
+          : '双足压力中心轨迹'}
         showInfo
       />
       {!hasData ? (
-        <UnavailableNotice>站立时间过短或信号不稳定，轨迹数据无法生成。</UnavailableNotice>
+        <UnavailableNotice>暂无可用的压力中心轨迹或统计数据。</UnavailableNotice>
+      ) : (
+        <div className="standing-report__cop-layout">
+          <div className="standing-report__cop-chart-column">
+            <div className="standing-report__cop-visual">
+              <svg viewBox="0 0 420 420" role="img" aria-label="双足压力中心移动轨迹">
+                <circle className="standing-report__cop-boundary" cx="210" cy="210" r="185" />
+                <circle className="standing-report__cop-stability-zone" cx="210" cy="210" r="65" />
+                <path className="standing-report__cop-axis" d="M210 18V402M18 210H402" />
+                <text x="210" y="16" textAnchor="middle">前</text>
+                <text x="210" y="417" textAnchor="middle">后</text>
+                <text x="9" y="215" textAnchor="middle">左</text>
+                <text x="411" y="215" textAnchor="middle">右</text>
+                {trajectoryPath && <path className="standing-report__cop-path" d={trajectoryPath} />}
+                {!trajectoryPath && <text className="standing-report__cop-empty" x="210" y="217" textAnchor="middle">暂无轨迹点</text>}
+                {trajectoryPath && <circle className="standing-report__cop-center" cx="210" cy="210" r="5" />}
+              </svg>
+            </div>
+            <div className="standing-report__cop-legend" aria-label="轨迹图例">
+              <span><i className="is-path" />压力中心轨迹</span>
+              <span><i className="is-zone" />自动缩放参考区</span>
+              <span><i className="is-center" />图示中心</span>
+            </div>
+          </div>
+          <div className="standing-report__cop-data-column">
+            <div className="standing-report__cop-metrics">
+              <CopMetric label={`${metricPrefix} 轨迹总长`} value={cop.pathLength} unit="cm" />
+              <CopMetric label={`${metricPrefix} 活动面积`} value={cop.area} unit="cm²" />
+              <CopMetric label="左右最大摆动" value={cop.lateralRange} unit="cm" />
+              <CopMetric label="前后最大摆动" value={cop.longitudinalRange} unit="cm" />
+              <CopMetric label="平均移动速度" value={cop.averageVelocity} unit="cm/s" />
+              <CopMetric label="最大偏移" value={cop.maxDisplacement} unit="cm" />
+              <CopMetric label="RMS 偏移" value={cop.rmsDisplacement} unit="cm" />
+              <CopMetric label="轨迹长轴" value={cop.majorAxis} unit="cm" />
+              <CopMetric label="轨迹短轴" value={cop.minorAxis} unit="cm" />
+            </div>
+            {directionSummary && <ResultNotice>{directionSummary}</ResultNotice>}
+            {cop.reference && (
+              <div className="standing-report__analysis-help">
+                <Info aria-hidden="true" />
+                <p>{cop.reference}</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </article>
+  );
+}
+
+function centerDirectionText(direction) {
+  if (direction === 'left') return '偏左';
+  if (direction === 'right') return '偏右';
+  if (direction === 'centered') return '居中';
+  return '方向未定';
+}
+
+function centerControlSummary(control) {
+  const facts = [];
+  if (isAvailable(control.lateralOffset)) {
+    const direction = centerDirectionText(control.lateralDirection);
+    facts.push(direction === '居中'
+      ? '左右位置居中'
+      : `受力中心${direction} ${formatNumber(Math.abs(control.lateralOffset))} cm`);
+  }
+  if (isAvailable(control.magnitude)) {
+    facts.push(`合成偏移 ${formatNumber(control.magnitude)} cm`);
+  }
+  return facts.length ? `${facts.join('，')}。` : null;
+}
+
+function CenterControlAnalysis({ control }) {
+  const hasData = control?.quality?.valid === true
+    && [control.lateralOffset, control.longitudinalOffset, control.magnitude].some(isAvailable);
+  const summary = hasData ? centerControlSummary(control) : null;
+
+  return (
+    <article
+      className="standing-report__analysis-card standing-report__analysis-card--center-control"
+      data-testid="standing-analysis-card"
+    >
+      <AnalysisHeading
+        id="standing-center-control-detail"
+        icon={Crosshair}
+        tone="orange"
+        title="重心控制推断"
+        subtitle="本次足底受力中心偏移"
+        showInfo
+      />
+      {!hasData ? (
+        <UnavailableNotice>重心偏移数据不足，建议重新检测。</UnavailableNotice>
       ) : (
         <>
-          <div className="standing-report__cop-visual">
-            <svg viewBox="0 0 420 420" role="img" aria-label="压力中心移动轨迹">
-              <circle className="standing-report__cop-boundary" cx="210" cy="210" r="185" />
-              <circle className="standing-report__cop-stability-zone" cx="210" cy="210" r="65" />
-              <path className="standing-report__cop-axis" d="M210 18V402M18 210H402" />
-              <text x="210" y="16" textAnchor="middle">前</text>
-              <text x="210" y="417" textAnchor="middle">后</text>
-              <text x="9" y="215" textAnchor="middle">左</text>
-              <text x="411" y="215" textAnchor="middle">右</text>
-              {trajectoryPath && <path className="standing-report__cop-path" d={trajectoryPath} />}
-              {!trajectoryPath && <text className="standing-report__cop-empty" x="210" y="217" textAnchor="middle">暂无轨迹点</text>}
-              {trajectoryPath && <circle className="standing-report__cop-center" cx="210" cy="210" r="5" />}
-            </svg>
+          <div className="standing-report__center-control-metrics">
+            <CopMetric label={`左右偏移（${centerDirectionText(control.lateralDirection)}）`} value={control.lateralOffset} unit="cm" />
+            <CopMetric label="前后偏移幅度" value={control.longitudinalOffset} unit="cm" />
+            <CopMetric label="合成偏移幅度" value={control.magnitude} unit="cm" />
+            <CopMetric label="峰值帧索引" value={control.frameIndex} unit="" />
           </div>
-          <div className="standing-report__cop-legend" aria-label="轨迹图例">
-            <span><i className="is-path" />压力中心轨迹</span>
-            <span><i className="is-zone" />稳定参考区（直径24 cm）</span>
-            <span><i className="is-center" />中心点</span>
+          {summary && <ResultNotice>{summary}</ResultNotice>}
+          <div className="standing-report__analysis-help">
+            <Info aria-hidden="true" />
+            <p>由足底压力估算，仅作重心控制参考。</p>
           </div>
-          <div className="standing-report__cop-metrics">
-            <CopMetric label="重心移动总路径" value={cop.pathLength} unit="cm" />
-            <CopMetric label="重心活动面积" value={cop.area} unit="cm²" />
-            <CopMetric label="左右最大晃动" value={cop.lateralRange} unit="cm" />
-            <CopMetric label="前后最大晃动" value={cop.longitudinalRange} unit="cm" />
-          </div>
-          {directionSummary && <ResultNotice>{directionSummary}</ResultNotice>}
-          {cop.reference && (
-            <div className="standing-report__analysis-help">
-              <Info aria-hidden="true" />
-              <p>{cop.reference}</p>
-            </div>
-          )}
         </>
       )}
     </article>
@@ -273,54 +311,96 @@ function pressureOpacity(value) {
 
 function FootPressureMap({ side, regions, color }) {
   const sideLabel = side === 'left' ? '左' : '右';
-  const mirror = side === 'left' ? 'translate(160 0) scale(-1 1)' : undefined;
+  const maskId = `standing-pressure-mask-${side}`;
+  const cropId = `standing-pressure-crop-${side}`;
+  const image = side === 'left'
+    ? { x: -7, y: 7, size: 317, cropX: 4, cropWidth: 144 }
+    : { x: -151, y: -42, size: 325, cropX: 10, cropWidth: 148 };
   const regionValues = {
     forefoot: formatPercent(regions.forefoot),
     midfoot: formatPercent(regions.midfoot),
     hindfoot: formatPercent(regions.hindfoot),
   };
+  const readingPositions = side === 'left'
+    ? {
+        forefoot: { x: 80, y: 80 },
+        midfoot: { x: 73, y: 161 },
+        hindfoot: { x: 97, y: 240 },
+      }
+    : {
+        forefoot: { x: 84, y: 81 },
+        midfoot: { x: 88, y: 161 },
+        hindfoot: { x: 54, y: 243 },
+      };
 
   return (
     <figure className={`standing-report__pressure-foot standing-report__pressure-foot--${side}`}>
       <figcaption style={{ color }}>{sideLabel}脚</figcaption>
-      <svg viewBox="0 0 160 290" role="img" aria-label={`${sideLabel}足足底压力分布`}>
-        <g className="standing-report__pressure-footprint" transform={mirror}>
-          <circle data-pressure-part="toe" cx="31" cy="31" r="19" fill={color} fillOpacity={pressureOpacity(regions.forefoot)} />
-          <ellipse data-pressure-part="toe" cx="61" cy="28" rx="14" ry="19" fill={color} fillOpacity={pressureOpacity(regions.forefoot)} />
-          <ellipse data-pressure-part="toe" cx="88" cy="34" rx="13" ry="18" fill={color} fillOpacity={pressureOpacity(regions.forefoot)} />
-          <ellipse data-pressure-part="toe" cx="112" cy="44" rx="11" ry="16" fill={color} fillOpacity={pressureOpacity(regions.forefoot)} />
-          <ellipse data-pressure-part="toe" cx="132" cy="57" rx="9" ry="13" fill={color} fillOpacity={pressureOpacity(regions.forefoot)} />
-          <path
+      <svg viewBox="0 0 170 300" role="img" aria-label={`${sideLabel}足足底压力分布`}>
+        <defs>
+          <clipPath id={cropId}>
+            <rect x={image.cropX} y="0" width={image.cropWidth} height="286" />
+          </clipPath>
+          <mask
+            id={maskId}
+            x="0"
+            y="0"
+            width="170"
+            height="286"
+            maskUnits="userSpaceOnUse"
+            maskContentUnits="userSpaceOnUse"
+            style={{ maskType: 'alpha' }}
+          >
+            <g clipPath={`url(#${cropId})`}>
+              <image
+                href="/icons/footprint.png"
+                x={image.x}
+                y={image.y}
+                width={image.size}
+                height={image.size}
+                preserveAspectRatio="none"
+              />
+            </g>
+          </mask>
+        </defs>
+
+        <g className="standing-report__pressure-footprint" mask={`url(#${maskId})`}>
+          <rect
             data-pressure-region="forefoot"
-            className="standing-report__pressure-region"
-            d="M31 59C47 45 93 44 119 60c19 12 23 41 14 66-22 11-75 11-107 0-6-25-8-50 5-67Z"
+            x="0"
+            y="0"
+            width="170"
+            height="118"
             fill={color}
             fillOpacity={pressureOpacity(regions.forefoot)}
           />
-          <path
+          <rect
             data-pressure-region="midfoot"
-            className="standing-report__pressure-region"
-            d="M26 126c23 9 84 11 107 0-7 20-12 39-14 57-2 16-1 28 1 37-22-10-57-10-80 0 4-18 4-36 1-54-3-15-9-29-15-40Z"
+            x="0"
+            y="118"
+            width="170"
+            height="82"
             fill={color}
             fillOpacity={pressureOpacity(regions.midfoot)}
           />
-          <path
+          <rect
             data-pressure-region="hindfoot"
-            className="standing-report__pressure-region"
-            d="M40 220c21-10 59-10 80 0 6 24-1 50-21 62-21 11-49 2-59-19-6-13-5-30 0-43Z"
+            x="0"
+            y="200"
+            width="170"
+            height="86"
             fill={color}
             fillOpacity={pressureOpacity(regions.hindfoot)}
           />
+          <path className="standing-report__pressure-divider" d="M0 118H170M0 200H170" />
         </g>
-        <text className="standing-report__pressure-value standing-report__pressure-value--light" x="80" y="105" textAnchor="middle">
-          {regionValues.forefoot}
-        </text>
-        <text className="standing-report__pressure-value" x="80" y="180" textAnchor="middle" style={{ fill: color }}>
-          {regionValues.midfoot}
-        </text>
-        <text className="standing-report__pressure-value standing-report__pressure-value--light" x="80" y="260" textAnchor="middle">
-          {regionValues.hindfoot}
-        </text>
+
+        {Object.entries(readingPositions).map(([region, position]) => (
+          <g className="standing-report__pressure-reading" key={region}>
+            <rect x={position.x - 33} y={position.y - 19} width="66" height="28" rx="14" />
+            <text x={position.x} y={position.y} textAnchor="middle">{regionValues[region]}</text>
+          </g>
+        ))}
       </svg>
     </figure>
   );
@@ -345,7 +425,20 @@ function hasRegionData(regions) {
 }
 
 function PressureAnalysis({ pressure }) {
-  const hasData = hasRegionData(pressure.leftRegions) || hasRegionData(pressure.rightRegions);
+  const hasMapData = hasRegionData(pressure.leftRegions) || hasRegionData(pressure.rightRegions);
+  const leftForward = pressure.copDistances?.leftForward;
+  const longitudinalOffsetStat = isAvailable(leftForward)
+    ? [leftForward >= 0 ? '左足前移量' : '左足后移量', Math.abs(leftForward), 'cm']
+    : ['左足前后错位', null, 'cm'];
+  const stats = [
+    ['左脚承重', pressure.leftPercent, '%'],
+    ['右脚承重', pressure.rightPercent, '%'],
+    ['左足 COP 至整体 COP', pressure.copDistances?.left, 'cm'],
+    ['右足 COP 至整体 COP', pressure.copDistances?.right, 'cm'],
+    longitudinalOffsetStat,
+  ];
+  const hasStats = stats.some(([, value]) => isAvailable(value));
+  const hasData = hasMapData || hasStats;
   const summary = dominantPressureSummary(pressure);
 
   return (
@@ -358,17 +451,26 @@ function PressureAnalysis({ pressure }) {
         icon={Footprints}
         tone="blue"
         title="足底压力分布"
-        subtitle="左右足前足、中足和后足的压力占比"
+        subtitle="前足、中足和后足压力占比"
       />
       {!hasData ? (
-        <UnavailableNotice>足底压力采集时间过短，区域数据无法生成。</UnavailableNotice>
+        <UnavailableNotice>暂无可用的足底压力区域数据。</UnavailableNotice>
       ) : (
         <>
-          <div className="standing-report__pressure-map">
-            <FootPressureMap side="left" regions={pressure.leftRegions} color="#397bd5" />
-            <PressureRegionGuide />
-            <FootPressureMap side="right" regions={pressure.rightRegions} color="#ee7b43" />
-          </div>
+          {hasMapData && (
+            <div className="standing-report__pressure-map">
+              <FootPressureMap side="left" regions={pressure.leftRegions} color="#397bd5" />
+              <PressureRegionGuide />
+              <FootPressureMap side="right" regions={pressure.rightRegions} color="#ee7b43" />
+            </div>
+          )}
+          {hasStats && (
+            <div className="standing-report__pressure-stats">
+              {stats.map(([label, value, unit]) => (
+                <CopMetric label={label} value={value} unit={unit} key={label} />
+              ))}
+            </div>
+          )}
           {summary && <ResultNotice tone="blue">{summary}</ResultNotice>}
         </>
       )}
@@ -376,7 +478,27 @@ function PressureAnalysis({ pressure }) {
   );
 }
 
-function ArchScale({ side, type, index, area, color }) {
+function ArchDetail({ label, value, unit = '' }) {
+  return (
+    <p>
+      <span>{label}</span>
+      <strong>{formatNumber(value)}{isAvailable(value) && unit ? <small>{unit}</small> : null}</strong>
+    </p>
+  );
+}
+
+function ArchScale({
+  side,
+  type,
+  index,
+  area,
+  length,
+  width,
+  clarkeAngle,
+  clarkeType,
+  staheliRatio,
+  color,
+}) {
   const markerPosition = archMarkerPosition(index);
   return (
     <div className="standing-report__arch-side">
@@ -411,6 +533,16 @@ function ArchScale({ side, type, index, area, color }) {
         <strong>{formatNumber(area)}</strong>
         {isAvailable(area) && <small>cm²</small>}
       </p>
+      <div className="standing-report__arch-detail-grid">
+        <ArchDetail label="足长" value={length} unit="cm" />
+        <ArchDetail label="足宽" value={width} unit="cm" />
+        <ArchDetail label="Clarke 角" value={clarkeAngle} unit="°" />
+        <ArchDetail label="Staheli 比值" value={staheliRatio} />
+        <p className="standing-report__arch-detail-classification">
+          <span>Clarke 分类</span>
+          <strong>{clarkeType || '数据不足'}</strong>
+        </p>
+      </div>
     </div>
   );
 }
@@ -421,6 +553,10 @@ function FootSupportAnalysis({ arch }) {
     arch.rightIndex,
     arch.leftContactArea,
     arch.rightContactArea,
+    arch.leftLength,
+    arch.rightLength,
+    arch.leftClarkeAngle,
+    arch.rightClarkeAngle,
   ].some(isAvailable);
   const summary = archSummary(arch);
 
@@ -434,7 +570,7 @@ function FootSupportAnalysis({ arch }) {
         icon={Gauge}
         tone="lime"
         title="足弓与支撑状态"
-        subtitle="足弓指数及足底接触面积"
+        subtitle="足弓、尺寸与接触面积"
       />
       {!hasData ? (
         <UnavailableNotice>足弓或接触面积数据不完整，无法进行分析。</UnavailableNotice>
@@ -446,6 +582,11 @@ function FootSupportAnalysis({ arch }) {
               type={arch.leftType}
               index={arch.leftIndex}
               area={arch.leftContactArea}
+              length={arch.leftLength}
+              width={arch.leftWidth}
+              clarkeAngle={arch.leftClarkeAngle}
+              clarkeType={arch.leftClarkeType}
+              staheliRatio={arch.leftStaheliRatio}
               color="#397bd5"
             />
             <ArchScale
@@ -453,6 +594,11 @@ function FootSupportAnalysis({ arch }) {
               type={arch.rightType}
               index={arch.rightIndex}
               area={arch.rightContactArea}
+              length={arch.rightLength}
+              width={arch.rightWidth}
+              clarkeAngle={arch.rightClarkeAngle}
+              clarkeType={arch.rightClarkeType}
+              staheliRatio={arch.rightStaheliRatio}
               color="#ee7b43"
             />
           </div>
@@ -469,6 +615,7 @@ export function StandingDetailsPanel({ details }) {
       <h2><span />详细数据分析</h2>
       <div className="standing-report__analysis-grid">
         <CopAnalysis cop={details.cop} />
+        <CenterControlAnalysis control={details.centerControl} />
         <PressureAnalysis pressure={details.pressure} />
         <FootSupportAnalysis arch={details.arch} />
       </div>

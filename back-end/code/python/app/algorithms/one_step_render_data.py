@@ -50,6 +50,7 @@ def generate_standing_report(data_array, fps=42, threshold_ratio=0.8):
                 'arch_features': { 'left_foot': {...}, 'right_foot': {...} },
                 'additional_data': { 'left_length', 'right_length', ... },
                 'cop_time_series': { 'path_length', 'contact_area', ... },
+                'center_control': { 'lateral_offset_cm', 'quality', ... },
             }
     """
     # 确保是 list of lists 格式（preprocess_origin_data 期望的格式）
@@ -322,6 +323,25 @@ def get_cop_metrics(result):
     return {
         'left': result.get('left_cop_metrics', {}),
         'right': result.get('right_cop_metrics', {}),
+    }
+
+
+def get_center_control(result):
+    """Return the peak-frame plantar-COP proxy in frontend field style."""
+    center = result.get('center_control', {})
+    quality = center.get('quality', {})
+    return {
+        'scope': center.get('scope'),
+        'reference': center.get('reference'),
+        'frameIndex': center.get('frame_index'),
+        'lateralOffsetCm': center.get('lateral_offset_cm'),
+        'longitudinalOffsetCm': center.get('longitudinal_offset_cm'),
+        'magnitudeCm': center.get('magnitude_cm'),
+        'lateralDirection': center.get('lateral_direction'),
+        'quality': {
+            'valid': quality.get('valid', False),
+            'reason': quality.get('reason'),
+        },
     }
 
 

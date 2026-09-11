@@ -1,4 +1,4 @@
-import { finiteOrNull, parseCalendarDate } from './validators';
+import { finiteOrNull, parseCalendarDate } from './validators.js';
 
 /** Formats a numeric measurement without leaking invalid values into the UI. */
 export function formatMetric(value, fractionDigits = 2) {

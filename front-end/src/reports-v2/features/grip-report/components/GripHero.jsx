@@ -12,13 +12,24 @@ function HeroTitle({ hero }) {
   const accent = hero.hasScore && hero.status && hero.title.endsWith(hero.status)
     ? hero.status
     : '';
-  const title = accent ? hero.title.slice(0, -accent.length) : hero.title;
+  const rawTitle = accent ? hero.title.slice(0, -accent.length) : hero.title;
+  const title = rawTitle
+    .replace(/\s*\/\s*/g, '/')
+    .replace(/\s+分\s*$/, '分');
+  const scoreSuffix = accent
+    ? ''
+    : title.match(/\d+(?:\.\d+)?\/\d+(?:\.\d+)?分$/)?.[0] || '';
+  const tailLength = accent ? 0 : (scoreSuffix.length || Math.min(2, title.length));
+  const leadingTitle = tailLength ? title.slice(0, -tailLength) : title;
+  const trailingTitle = tailLength ? title.slice(-tailLength) : '';
 
   return (
     <h2 id="grip-hero-title" aria-label={hero.title}>
-      <span>{title}</span>
-      {accent ? <strong>{accent}</strong> : null}
-      <span className="grip-report__hero-emoji" aria-hidden="true">😊</span>
+      <span>{leadingTitle}</span>
+      <span className="grip-report__hero-title-tail">
+        {accent ? <strong>{accent}</strong> : trailingTitle}
+        <span className="grip-report__hero-emoji" aria-hidden="true">😊</span>
+      </span>
     </h2>
   );
 }

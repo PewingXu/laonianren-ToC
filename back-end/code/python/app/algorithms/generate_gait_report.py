@@ -2015,6 +2015,233 @@ def _smooth_and_crop(heatmap, upscale=3, sigma=0.8, pad=2):
     return cropped, smoothed, rmin, cmin, H, W
 
 
+def _initial_gait_baseline_indexes(events):
+    """Identify the initial standing contacts before alternating walking starts."""
+    sync_gap = 8
+    minimum_walk_gap = 5
+    baseline_indexes = set()
+    walk_start_index = None
+
+    for index in range(max(0, len(events) - 2)):
+        first, second, third = events[index:index + 3]
+        first_gap = abs(first.get('frameIndex', 0) - second.get('frameIndex', 0))
+        second_gap = abs(second.get('frameIndex', 0) - third.get('frameIndex', 0))
+        if (
+            first.get('sourceIsRight') != second.get('sourceIsRight')
+            and second.get('sourceIsRight') != third.get('sourceIsRight')
+            and first.get('sourceIsRight') == third.get('sourceIsRight')
+            and first_gap >= minimum_walk_gap
+            and second_gap >= minimum_walk_gap
+        ):
+            walk_start_index = index
+            break
+
+    if walk_start_index is not None and walk_start_index > 0:
+        baseline_indexes.update(range(walk_start_index))
+
+    if len(events) >= 2:
+        first, second = events[0], events[1]
+        if (
+            first.get('sourceIsRight') != second.get('sourceIsRight')
+            and abs(first.get('frameIndex', 0) - second.get('frameIndex', 0)) <= sync_gap
+        ):
+            baseline_indexes.update([0, 1])
+
+    return baseline_indexes
+
+
+# 一帧里不一定只站着一只脚：get_foot_mask_by_centers 只按"离哪只脚的横向中心更近"
+# 分配连通域，行走横向漂移或步宽很窄时，另一只脚的足印会被划进这只脚的掩膜。
+# 那时整帧质心会落在两个足印中间，脚印行走图的连线与步号就画到足印外面去了。
+FOOTPRINT_FORWARD_GAP_CELLS = 6   # 同一只脚的足弓断裂一般只隔 2~3 行
+FOOTPRINT_LATERAL_GAP_CELLS = 2   # 同一只脚的前后掌横向必然重叠
+
+
+def _is_same_footprint(box_a, box_b):
+    """两个连通域的包围盒是否近到只可能属于同一只脚。"""
+    forward_gap = max(0, box_a[0] - box_b[1] - 1, box_b[0] - box_a[1] - 1)
+    lateral_gap = max(0, box_a[2] - box_b[3] - 1, box_b[2] - box_a[3] - 1)
+    return (
+        forward_gap <= FOOTPRINT_FORWARD_GAP_CELLS
+        and lateral_gap <= FOOTPRINT_LATERAL_GAP_CELLS
+    )
+
+
+def _isolate_peak_footprint(force_frame):
+    """只保留承重最大的那一个足印，丢掉混进同一掩膜的另一只脚。"""
+    binary = (force_frame > 0).astype(np.uint8)
+    num_labels, labels, _, _ = unite_broken_arch_components(binary, dist_threshold=3.0)
+
+    boxes = {}
+    for label in range(1, num_labels):
+        rows, columns = np.where(labels == label)
+        if rows.size:
+            boxes[label] = (
+                int(rows.min()), int(rows.max()),
+                int(columns.min()), int(columns.max()),
+            )
+    if len(boxes) <= 1:
+        return force_frame
+
+    # 先把足弓断开的前后掌并回同一只脚，再整簇比较承重。
+    clusters = []
+    for label, box in boxes.items():
+        merged = [label]
+        remaining = []
+        for cluster in clusters:
+            if any(_is_same_footprint(box, boxes[member]) for member in cluster):
+                merged.extend(cluster)
+            else:
+                remaining.append(cluster)
+        remaining.append(merged)
+        clusters = remaining
+
+    strongest = max(
+        clusters,
+        key=lambda cluster: float(np.sum(force_frame[np.isin(labels, sorted(cluster))])),
+    )
+    return np.where(np.isin(labels, sorted(strongest)), force_frame, 0)
+
+
+def build_peak_footprint_trail_data(
+    total_matrix,
+    left_peaks,
+    right_peaks,
+    center_l,
+    center_r,
+    sensor_pitch_mm=14.0,
+):
+    """Serialize each contact-area peak frame in one physical coordinate system.
+
+    Peak indexes come from the existing non-zero contact-area curves. Each
+    footprint is cropped only for payload size. ``origin`` keeps its location on
+    the mirrored pressure walkway, so the report can rotate the walkway for a
+    horizontal presentation while retaining one uniform scale in both axes.
+    """
+    empty_result = {
+        'sensorSize': [0, 0],
+        'sensorPitchMm': None,
+        'steps': [],
+        'stepCount': 0,
+        'baselineCount': 0,
+        'quality': {'valid': False, 'reason': 'missing_peak_footprints'},
+    }
+
+    sensor_pitch_mm = _positive_finite_config(sensor_pitch_mm)
+    if sensor_pitch_mm is None:
+        raise ValueError('sensor pitch must be a positive finite number')
+
+    try:
+        data_np = np.asarray(total_matrix, dtype=float)
+    except (TypeError, ValueError):
+        return empty_result
+    if data_np.ndim != 3 or data_np.shape[0] == 0:
+        return empty_result
+
+    _, height, width = data_np.shape
+    candidates = []
+    for source_is_right, peak_indexes in ((False, left_peaks), (True, right_peaks)):
+        indexes = [] if peak_indexes is None else peak_indexes
+        for raw_index in indexes:
+            if isinstance(raw_index, bool):
+                continue
+            try:
+                frame_index = int(raw_index)
+            except (TypeError, ValueError, OverflowError):
+                continue
+            if frame_index < 0 or frame_index >= data_np.shape[0]:
+                continue
+
+            frame = data_np[frame_index]
+            if not np.all(np.isfinite(frame)) or np.max(frame) <= 0:
+                continue
+            foot_mask = get_foot_mask_by_centers(
+                frame,
+                source_is_right,
+                center_l,
+                center_r,
+            )
+            force_frame = adc_to_force(frame * foot_mask)
+            force_frame = np.where(np.isfinite(force_frame) & (force_frame > 0), force_frame, 0)
+            maximum_force = float(np.max(force_frame))
+            if maximum_force <= 0:
+                continue
+
+            # Remove low sensor noise while retaining the full measured footprint.
+            threshold = max(0.05, maximum_force * 0.02)
+            force_frame = np.where(force_frame >= threshold, force_frame, 0)
+            mirrored = _isolate_peak_footprint(np.fliplr(force_frame))
+            rows, columns = np.where(mirrored > 0)
+            if rows.size == 0:
+                continue
+
+            row_min, row_max = int(np.min(rows)), int(np.max(rows))
+            col_min, col_max = int(np.min(columns)), int(np.max(columns))
+            patch = mirrored[row_min:row_max + 1, col_min:col_max + 1]
+            weights = mirrored[rows, columns]
+            weight_sum = float(np.sum(weights))
+            if not np.isfinite(weight_sum) or weight_sum <= 0:
+                continue
+
+            candidates.append({
+                'frameIndex': frame_index,
+                'sourceIsRight': bool(source_is_right),
+                'origin': [col_min, row_min],
+                'center': [
+                    round(float(np.sum(columns * weights) / weight_sum), 2),
+                    round(float(np.sum(rows * weights) / weight_sum), 2),
+                ],
+                'matrix': [
+                    [round(float(value), 1) for value in row]
+                    for row in patch
+                ],
+                'peakLoadN': round(weight_sum, 1),
+                'peakSensorForceN': round(maximum_force, 1),
+            })
+
+    candidates.sort(key=lambda item: item['frameIndex'])
+    deduped = []
+    same_foot_min_gap = 6
+    for candidate in candidates:
+        if (
+            deduped
+            and candidate['sourceIsRight'] == deduped[-1]['sourceIsRight']
+            and abs(candidate['frameIndex'] - deduped[-1]['frameIndex']) <= same_foot_min_gap
+        ):
+            if candidate['peakLoadN'] > deduped[-1]['peakLoadN']:
+                deduped[-1] = candidate
+            continue
+        deduped.append(candidate)
+
+    baseline_indexes = _initial_gait_baseline_indexes(deduped)
+    mirrored_left_center = width - 1 - float(center_l)
+    mirrored_right_center = width - 1 - float(center_r)
+    visual_midline = (mirrored_left_center + mirrored_right_center) / 2.0
+    step_count = 0
+    for index, candidate in enumerate(deduped):
+        is_right = candidate['center'][0] > visual_midline
+        candidate['isRight'] = bool(is_right)
+        candidate['isBaseline'] = index in baseline_indexes
+        side_text = '右脚' if is_right else '左脚'
+        if candidate['isBaseline']:
+            candidate['stepIndex'] = None
+            candidate['stepLabel'] = f'起始{side_text}'
+        else:
+            step_count += 1
+            candidate['stepIndex'] = step_count
+            candidate['stepLabel'] = f'第{step_count}步{side_text}'
+
+    reason = None if step_count else 'no_walking_steps'
+    return {
+        'sensorSize': [int(height), int(width)],
+        'sensorPitchMm': round(sensor_pitch_mm, 2),
+        'steps': deduped,
+        'stepCount': step_count,
+        'baselineCount': len(deduped) - step_count,
+        'quality': {'valid': step_count > 0, 'reason': reason},
+    }
+
+
 def build_footprint_heatmap_data(left_regions, right_regions, total_matrix, left_peaks, right_peaks, center_l, center_r):
     """提取完整足印热力图数据（供前端渲染），逻辑与 plot_all_largest_regions_heatmap 一致"""
     data_np = np.array(total_matrix)
@@ -2095,32 +2322,7 @@ def build_footprint_heatmap_data(left_regions, right_regions, total_matrix, left
     # detect initial static standing segment:
     # - 初始平行站立常出现左右脚近同步峰，不应计入“第1步”
     # - 仅从首次稳定交替步态开始编号
-    STEP_SYNC_GAP = 8
-    STEP_MIN_WALK_GAP = 5
-    baseline_indexes = set()
-    walk_start_idx = None
-
-    for i in range(max(0, len(fpa_lines) - 2)):
-        a, b, c = fpa_lines[i], fpa_lines[i + 1], fpa_lines[i + 2]
-        g1 = abs(a.get('frameIndex', 0) - b.get('frameIndex', 0))
-        g2 = abs(b.get('frameIndex', 0) - c.get('frameIndex', 0))
-        if (
-            a.get('sourceIsRight') != b.get('sourceIsRight')
-            and b.get('sourceIsRight') != c.get('sourceIsRight')
-            and a.get('sourceIsRight') == c.get('sourceIsRight')
-            and g1 >= STEP_MIN_WALK_GAP
-            and g2 >= STEP_MIN_WALK_GAP
-        ):
-            walk_start_idx = i
-            break
-
-    if walk_start_idx is not None and walk_start_idx > 0:
-        baseline_indexes.update(range(walk_start_idx))
-
-    if len(fpa_lines) >= 2:
-        first, second = fpa_lines[0], fpa_lines[1]
-        if first.get('sourceIsRight') != second.get('sourceIsRight') and abs(first.get('frameIndex', 0) - second.get('frameIndex', 0)) <= STEP_SYNC_GAP:
-            baseline_indexes.update([0, 1])
+    baseline_indexes = _initial_gait_baseline_indexes(fpa_lines)
 
     # attach step labels
     center_l_m = (W - 1 - float(center_l))
@@ -2148,6 +2350,380 @@ def build_footprint_heatmap_data(left_regions, right_regions, total_matrix, left
         'rawHeatmap': [[round(float(v), 1) for v in row] for row in raw],
         'fpaLines': fpa_lines,
         'size': [int(smooth.shape[0]), int(smooth.shape[1])],
+    }
+
+
+def _positive_finite_config(value):
+    if isinstance(value, bool):
+        return None
+    try:
+        numeric = float(value)
+    except (TypeError, ValueError):
+        return None
+    return numeric if np.isfinite(numeric) and numeric > 0 else None
+
+
+def _finite_coordinate_pair(value):
+    if not isinstance(value, (list, tuple)) or len(value) < 2:
+        return None
+    if isinstance(value[0], bool) or isinstance(value[1], bool):
+        return None
+    try:
+        pair = np.asarray([float(value[0]), float(value[1])], dtype=float)
+    except (TypeError, ValueError):
+        return None
+    return pair if np.all(np.isfinite(pair)) else None
+
+
+def _extract_peak_footprint_placements(footprint_trail):
+    """Return peak-footprint centers in the original sensor coordinate grid."""
+    if not isinstance(footprint_trail, dict):
+        return []
+    steps = footprint_trail.get("steps")
+    if not isinstance(steps, (list, tuple)):
+        return []
+
+    placements = []
+    for step in steps:
+        if not isinstance(step, dict) or step.get("isBaseline") is True:
+            continue
+
+        side = step.get("sourceIsRight")
+        if not isinstance(side, bool):
+            side = step.get("isRight")
+        if not isinstance(side, bool):
+            continue
+
+        center = _finite_coordinate_pair(step.get("center"))
+        frame_index = step.get("frameIndex")
+        if center is None or isinstance(frame_index, bool):
+            continue
+        try:
+            frame_index = float(frame_index)
+        except (TypeError, ValueError):
+            continue
+        if not np.isfinite(frame_index):
+            continue
+
+        # footprintTrail centers use [lateral, forward] sensor coordinates.
+        placements.append({
+            "frame": frame_index,
+            "side": 1.0 if side else -1.0,
+            "lateral": float(center[0]),
+            "forward": float(center[1]),
+        })
+
+    placements.sort(key=lambda item: item["frame"])
+    return placements
+
+
+def _extract_fpa_footprint_placements(fpa_lines):
+    """Return legacy FPA-derived centers in the cropped, upscaled canvas."""
+    if not isinstance(fpa_lines, (list, tuple)):
+        return []
+
+    placements = []
+    for line in fpa_lines:
+        if not isinstance(line, dict) or line.get("isBaseline") is True:
+            continue
+
+        side = line.get("sourceIsRight")
+        if not isinstance(side, bool):
+            side = line.get("isRight")
+        if not isinstance(side, bool):
+            continue
+
+        heel = _finite_coordinate_pair(line.get("heel"))
+        fore = _finite_coordinate_pair(line.get("fore"))
+        frame_index = line.get("frameIndex")
+        if heel is None or fore is None or isinstance(frame_index, bool):
+            continue
+        try:
+            frame_index = float(frame_index)
+        except (TypeError, ValueError):
+            continue
+        if not np.isfinite(frame_index):
+            continue
+
+        # fpaLines uses [lateral, forward] in the cropped, upscaled canvas.
+        center = (heel + fore) / 2.0
+        placements.append({
+            "frame": frame_index,
+            "side": 1.0 if side else -1.0,
+            "lateral": float(center[0]),
+            "forward": float(center[1]),
+        })
+
+    placements.sort(key=lambda item: item["frame"])
+    return placements
+
+
+def _longest_alternating_run(placements):
+    """Discard duplicate/missed same-side contacts without joining separate runs."""
+    longest_run = []
+    current_run = []
+    for placement in placements:
+        if current_run and placement["side"] == current_run[-1]["side"]:
+            if len(current_run) > len(longest_run):
+                longest_run = current_run
+            current_run = [placement]
+        else:
+            current_run.append(placement)
+    if len(current_run) > len(longest_run):
+        longest_run = current_run
+    return longest_run
+
+
+def calculate_walking_stability(
+    fpa_lines=None,
+    frame_ms=40.0,
+    sensor_pitch_mm=14.0,
+    coordinate_upscale=3.0,
+    *,
+    footprint_trail=None,
+):
+    """Measure step-to-step timing and footprint-spacing consistency.
+
+    The coefficients of variation are calculated from consecutive, genuinely
+    alternating plantar contacts. Peak-footprint centers are the primary
+    geometry; FPA lines remain a compatibility fallback for older callers.
+    They describe repeatability on the pressure walkway and must not be
+    interpreted as trunk sway or center-of-mass motion.
+    """
+    scope = "step_to_step_footprint_consistency"
+    reference = "consecutive_alternating_footprints"
+
+    def result_template(reason, sample_count=0, forward_span_cm=None, confidence=None):
+        return {
+            "scope": scope,
+            "reference": reference,
+            "stepTimeCvPercent": None,
+            "stepDistanceCvPercent": None,
+            "meanStepTimeSeconds": None,
+            "meanStepDistanceCm": None,
+            "sampleCount": int(sample_count),
+            "intervalCount": max(0, int(sample_count) - 1),
+            "forwardSpanCm": forward_span_cm,
+            "quality": {
+                "valid": False,
+                "reason": reason,
+                "confidence": confidence,
+            },
+        }
+
+    frame_ms = _positive_finite_config(frame_ms)
+    sensor_pitch_mm = _positive_finite_config(sensor_pitch_mm)
+    coordinate_upscale = _positive_finite_config(coordinate_upscale)
+    if frame_ms is None or sensor_pitch_mm is None or coordinate_upscale is None:
+        raise ValueError(
+            "frame interval, sensor pitch and coordinate upscale must be positive finite numbers"
+        )
+
+    peak_placements = _extract_peak_footprint_placements(footprint_trail)
+    if peak_placements:
+        placements = peak_placements
+        coordinates_per_sensor = 1.0
+    else:
+        placements = _extract_fpa_footprint_placements(fpa_lines)
+        coordinates_per_sensor = coordinate_upscale
+
+    run = _longest_alternating_run(placements)
+    sample_count = len(run)
+    left_count = sum(item["side"] < 0 for item in run)
+    right_count = sum(item["side"] > 0 for item in run)
+    if sample_count < 4 or left_count < 2 or right_count < 2:
+        return result_template("insufficient_alternating_steps", sample_count)
+
+    frames = np.asarray([item["frame"] for item in run], dtype=float)
+    centers = np.asarray(
+        [[item["lateral"], item["forward"]] for item in run],
+        dtype=float,
+    )
+    cm_per_coordinate = sensor_pitch_mm / 10.0 / coordinates_per_sensor
+    forward = centers[:, 1]
+    forward_span_cm = round(float(np.ptp(forward) * cm_per_coordinate), 2)
+    if forward_span_cm < (2.0 * sensor_pitch_mm / 10.0):
+        return result_template(
+            "insufficient_forward_progression",
+            sample_count,
+            forward_span_cm,
+        )
+
+    forward_deltas = np.diff(forward)
+    nonzero_forward_deltas = forward_deltas[np.abs(forward_deltas) > 1e-9]
+    if nonzero_forward_deltas.size == 0:
+        return result_template(
+            "insufficient_forward_progression",
+            sample_count,
+            forward_span_cm,
+        )
+    forward_direction = 1.0 if np.median(nonzero_forward_deltas) > 0 else -1.0
+    if float(np.mean(forward_direction * forward_deltas > 0)) < 0.8:
+        return result_template(
+            "non_monotonic_progression",
+            sample_count,
+            forward_span_cm,
+        )
+
+    step_times = np.diff(frames) * frame_ms / 1000.0
+    step_distances = np.linalg.norm(np.diff(centers, axis=0), axis=1) * cm_per_coordinate
+
+    if (
+        step_times.size < 3
+        or step_distances.size < 3
+        or not np.all(np.isfinite(step_times))
+        or not np.all(np.isfinite(step_distances))
+        or np.any(step_times <= 0)
+        or np.any(step_distances <= 0)
+    ):
+        return result_template("invalid_step_intervals", sample_count, forward_span_cm)
+
+    mean_step_time = float(np.mean(step_times))
+    mean_step_distance = float(np.mean(step_distances))
+    step_time_cv = float(np.std(step_times, ddof=1) / mean_step_time * 100.0)
+    step_distance_cv = float(np.std(step_distances, ddof=1) / mean_step_distance * 100.0)
+    if not np.isfinite(step_time_cv) or not np.isfinite(step_distance_cv):
+        return result_template("non_finite_result", sample_count, forward_span_cm)
+
+    confidence = "standard" if sample_count >= 6 else "limited"
+    return {
+        "scope": scope,
+        "reference": reference,
+        "stepTimeCvPercent": round(step_time_cv, 2),
+        "stepDistanceCvPercent": round(step_distance_cv, 2),
+        "meanStepTimeSeconds": round(mean_step_time, 3),
+        "meanStepDistanceCm": round(mean_step_distance, 2),
+        "sampleCount": sample_count,
+        "intervalCount": sample_count - 1,
+        "forwardSpanCm": forward_span_cm,
+        "quality": {
+            "valid": True,
+            "reason": None,
+            "confidence": confidence,
+        },
+    }
+
+
+def calculate_direction_control(
+    fpa_lines=None,
+    sensor_pitch_mm=14.0,
+    coordinate_upscale=3.0,
+    *,
+    footprint_trail=None,
+):
+    """Estimate straight-line consistency from measured plantar footprints.
+
+    Each valid peak footprint contributes its pressure-weighted center. For
+    older callers without peak footprints, the midpoint between the measured
+    FPA heel and forefoot centers is retained as a compatibility fallback. Two
+    parallel footprint paths are fitted together:
+
+        lateral = intercept + slope * forward + side_offset * side + residual
+
+    The side term removes normal left/right step width, while the slope removes
+    an overall diagonal walking direction on the mat. The reported deviations
+    are perpendicular residuals from those fitted paths. They describe plantar
+    footprint placement only; they are not a trunk-sway or center-of-mass metric.
+    """
+    scope = "plantar_footpath_straightness_proxy"
+    reference = "parallel_footprint_centerlines"
+
+    def result_template(reason, sample_count=0, forward_span_cm=None):
+        return {
+            "scope": scope,
+            "reference": reference,
+            "pathDeviationRmsCm": None,
+            "maxPathDeviationCm": None,
+            "sampleCount": int(sample_count),
+            "forwardSpanCm": forward_span_cm,
+            "quality": {"valid": False, "reason": reason, "confidence": None},
+        }
+
+    sensor_pitch_mm = _positive_finite_config(sensor_pitch_mm)
+    coordinate_upscale = _positive_finite_config(coordinate_upscale)
+    if sensor_pitch_mm is None or coordinate_upscale is None:
+        raise ValueError("sensor pitch and coordinate upscale must be positive finite numbers")
+
+    peak_placements = _extract_peak_footprint_placements(footprint_trail)
+    if peak_placements:
+        placements = peak_placements
+        coordinates_per_sensor = 1.0
+    else:
+        placements = _extract_fpa_footprint_placements(fpa_lines)
+        coordinates_per_sensor = coordinate_upscale
+
+    if not placements:
+        return result_template("missing_step_geometry")
+
+    # Use the longest genuinely alternating run so duplicate or missed peaks do
+    # not silently turn a same-side sequence into a direction measurement.
+    longest_run = _longest_alternating_run(placements)
+
+    sample_count = len(longest_run)
+    left_count = sum(item["side"] < 0 for item in longest_run)
+    right_count = sum(item["side"] > 0 for item in longest_run)
+    if sample_count < 4 or left_count < 2 or right_count < 2:
+        return result_template("insufficient_alternating_steps", sample_count)
+
+    forward = np.asarray([item["forward"] for item in longest_run], dtype=float)
+    lateral = np.asarray([item["lateral"] for item in longest_run], dtype=float)
+    sides = np.asarray([item["side"] for item in longest_run], dtype=float)
+    cm_per_coordinate = sensor_pitch_mm / 10.0 / coordinates_per_sensor
+    forward_span_cm = round(float(np.ptp(forward) * cm_per_coordinate), 2)
+
+    # Four alternating contacts are the mathematical minimum for this
+    # three-parameter fit. Also require spatial coverage to reject static noise.
+    if forward_span_cm < (2.0 * sensor_pitch_mm / 10.0):
+        return result_template(
+            "insufficient_forward_progression",
+            sample_count,
+            forward_span_cm,
+        )
+
+    deltas = np.diff(forward)
+    nonzero_deltas = deltas[np.abs(deltas) > 1e-9]
+    if nonzero_deltas.size == 0:
+        return result_template(
+            "insufficient_forward_progression",
+            sample_count,
+            forward_span_cm,
+        )
+    direction = 1.0 if np.median(nonzero_deltas) > 0 else -1.0
+    monotonic_ratio = float(np.mean(direction * deltas > 0))
+    if monotonic_ratio < 0.8:
+        return result_template(
+            "non_monotonic_progression",
+            sample_count,
+            forward_span_cm,
+        )
+
+    centered_forward = forward - np.mean(forward)
+    design = np.column_stack((np.ones(sample_count), centered_forward, sides))
+    if np.linalg.matrix_rank(design) < 3:
+        return result_template("degenerate_path_fit", sample_count, forward_span_cm)
+
+    coefficients, _, _, _ = np.linalg.lstsq(design, lateral, rcond=None)
+    slope = float(coefficients[1])
+    residual = lateral - design @ coefficients
+    perpendicular_cm = residual / math.sqrt(1.0 + slope * slope) * cm_per_coordinate
+
+    path_deviation_rms_cm = float(np.sqrt(np.mean(np.square(perpendicular_cm))))
+    max_path_deviation_cm = float(np.max(np.abs(perpendicular_cm)))
+    if not np.isfinite(path_deviation_rms_cm) or not np.isfinite(max_path_deviation_cm):
+        return result_template("non_finite_result", sample_count, forward_span_cm)
+
+    return {
+        "scope": scope,
+        "reference": reference,
+        "pathDeviationRmsCm": round(path_deviation_rms_cm, 2),
+        "maxPathDeviationCm": round(max_path_deviation_cm, 2),
+        "sampleCount": int(sample_count),
+        "forwardSpanCm": forward_span_cm,
+        "quality": {
+            "valid": True,
+            "reason": None,
+            "confidence": "standard" if sample_count >= 6 else "limited",
+        },
     }
 
 
@@ -3810,6 +4386,27 @@ def analyze_gait_from_content(csv_contents, working_dir=None):
         left_regions, right_regions, raw_total_matrix,
         raw_lx, raw_rx, raw_center_l, raw_center_r
     )
+    footprint_trail = build_peak_footprint_trail_data(
+        raw_total_matrix,
+        raw_lx,
+        raw_rx,
+        raw_center_l,
+        raw_center_r,
+        sensor_pitch_mm=SENSOR_PITCH_MM,
+    )
+    direction_control = calculate_direction_control(
+        footprint_hm_data.get("fpaLines", []),
+        sensor_pitch_mm=SENSOR_PITCH_MM,
+        coordinate_upscale=3.0,
+        footprint_trail=footprint_trail,
+    )
+    walking_stability = calculate_walking_stability(
+        footprint_hm_data.get("fpaLines", []),
+        frame_ms=FRAME_MS,
+        sensor_pitch_mm=SENSOR_PITCH_MM,
+        coordinate_upscale=3.0,
+        footprint_trail=footprint_trail,
+    )
     gait_avg_data = build_gait_average_data(
         total_matrix, left_on, left_off, right_on, right_off, center_l, center_r
     )
@@ -4056,6 +4653,9 @@ def analyze_gait_from_content(csv_contents, working_dir=None):
         pressure_evo_data = swap_left_right_dict(pressure_evo_data)
 
     result = {
+        "directionControl": direction_control,
+        "walkingStability": walking_stability,
+        "footprintTrail": footprint_trail,
         "gaitParams": {
             "leftStepTime": left_step_time,
             "rightStepTime": right_step_time,

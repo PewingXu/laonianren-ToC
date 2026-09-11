@@ -126,7 +126,22 @@
   html[data-printing] [data-print-root] [class*="__metric"],
   html[data-printing] [data-print-root] [class*="__tile"],
   html[data-printing] [data-print-root] [class*="__advice"],
+  html[data-printing] [data-print-root] .standing-report__footer,
+  html[data-printing] [data-print-root] .gait-report__footer,
   html[data-printing] [data-print-root] [class*="__insight"] {
+    break-inside: avoid;
+  }
+
+  /* AI 总结和建议合在同一个末尾容器中，整组通常高于单个可打印区域。
+     允许外层自然分页，只保护总结卡和每张建议卡不被拆开。 */
+  html[data-printing] [data-print-root] .assessment-ai-guidance,
+  html[data-printing] [data-print-root] .assessment-ai-guidance__advice-section,
+  html[data-printing] [data-print-root] .assessment-ai-guidance__advice-grid {
+    break-inside: auto;
+  }
+
+  html[data-printing] [data-print-root] .assessment-ai-guidance__summary-card,
+  html[data-printing] [data-print-root] .assessment-ai-guidance__advice-card {
     break-inside: avoid;
   }
 

@@ -15,28 +15,51 @@ const CARD_META = {
     title: '行走稳定性',
     tone: 'green',
     status: { '优秀': '身体控制能力很好' },
-    attention: '转身、上下楼和日常行走时，身体支撑更容易保持稳定。',
+    positiveStatuses: ['优秀', '良好', '稳定'],
+    attention: {
+      positive: '转身、上下楼和日常行走时，身体支撑更容易保持稳定。',
+      neutral: '请结合落脚规律、步速和现场表现，关注连续行走时的一致性。',
+      insufficient: '当前连续交替落脚数据不足，暂不能计算步态规律性。',
+    },
   },
   coordination: {
     icon: Footprints,
     title: '双腿协调性',
     tone: 'blue',
-    status: { '平衡': '左右脚配合均衡' },
-    attention: '走路时双腿配合更自然，有助于减少单侧持续负担。',
+    status: {
+      '平衡': '左右脚配合均衡',
+      '时空参数基本对称': '步态时空参数基本对称',
+    },
+    positiveStatuses: ['平衡', '基本对称', '时空参数基本对称', '优秀', '良好'],
+    attention: {
+      positive: '走路时双腿配合更自然，有助于减少单侧持续负担。',
+      neutral: '请结合左右负荷和双侧时空参数，关注是否存在持续单侧负担。',
+      insufficient: '当前左右负荷或双侧时空参数不足，暂不能判断双腿协调性。',
+    },
   },
   rhythm: {
     icon: HeartPulse,
     title: '步频节奏',
     tone: 'orange',
     status: { '优秀': '行走节奏稳定自然' },
-    attention: '连续行走时可继续关注节奏和步幅是否保持稳定。',
+    positiveStatuses: ['优秀', '良好', '稳定'],
+    attention: {
+      positive: '连续行走时可继续关注节奏和同脚步幅是否保持稳定。',
+      neutral: '请结合步频与同脚步幅实测值，关注连续行走时节奏是否稳定。',
+      insufficient: '当前步频或同脚步幅数据不足，暂不能判断行走节奏。',
+    },
   },
   direction: {
     icon: Compass,
     title: '方向控制能力',
     tone: 'purple',
     status: { '良好': '行走路线控制良好' },
-    attention: '在人群环境或转向移动时，可继续关注路线偏移和身体调整。',
+    positiveStatuses: ['优秀', '良好', '稳定'],
+    attention: {
+      positive: '在人群环境或转向移动时，可继续关注路线偏移和身体调整。',
+      neutral: '请结合路线偏移实测值，关注转向移动时的方向控制。',
+      insufficient: '当前没有可靠的路线偏移数据，暂不能判断方向控制能力。',
+    },
   },
 };
 
@@ -47,6 +70,21 @@ function textOr(value, fallback) {
 function interpretationStatus(ability, meta) {
   const status = textOr(ability?.status, '数据不足');
   return meta.status[status] || status;
+}
+
+function attentionCopy(ability, meta) {
+  const status = textOr(ability?.status, '数据不足');
+  if (status === '数据不足') return meta.attention.insufficient;
+  if (ability?.id === 'stability' && ability.metricMode === 'stepVariability') {
+    return '请结合相邻落脚的步时与间距变异，持续观察行走规律是否稳定。';
+  }
+  if (ability?.id === 'coordination') {
+    return /需关注|负荷较高/.test(status)
+      ? meta.attention.neutral
+      : meta.attention.positive;
+  }
+  if (meta.positiveStatuses.includes(status)) return meta.attention.positive;
+  return meta.attention.neutral;
 }
 
 function trendCopy(summary) {
@@ -89,7 +127,7 @@ function InterpretationCard({ ability, onShowAbility }) {
           </p>
           <p>
             <strong>更多关注</strong>
-            <span>{meta.attention}</span>
+            <span>{attentionCopy(ability, meta)}</span>
           </p>
         </div>
       </div>

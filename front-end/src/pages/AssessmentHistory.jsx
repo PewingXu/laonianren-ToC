@@ -15,12 +15,15 @@ import {
   rebuildDistributionFromIndex,
   computeRankFromDist,
   clearDistribution,
+  isScoreCacheCurrent,
+  markScoreCacheCurrent,
 } from '../lib/scoreRanking';
 import {
   buildComprehensiveScoreResult,
   ASSESSMENT_KEYS,
   ASSESSMENT_LABELS as SHORT_LABELS,
 } from '../lib/assessmentScoring';
+import { prepareAssessmentsForScoring } from '../lib/reportScoringAdapter';
 
 const MODULE_COUNT = ASSESSMENT_KEYS.length;
 // 表格栅格：序号1 + 患者2 + 日期1 + 各评估各1 + 完成度2 + 操作2
@@ -84,6 +87,7 @@ export default function AssessmentHistory() {
   const [busy, setBusy] = useState(false);       // 导入/生成进行中
   const [busyMsg, setBusyMsg] = useState('');
   const [rankMap, setRankMap] = useState({});    // recordId -> { [type]: {percent, total, ...} }
+  const [rankCacheReady, setRankCacheReady] = useState(() => isScoreCacheCurrent());
 
   // 搜索防抖：每敲一个字都要全量读取+过滤历史，记录多时逐键卡顿；停止输入 280ms 后再查
   const [debouncedTerm, setDebouncedTerm] = useState('');
@@ -159,7 +163,8 @@ export default function AssessmentHistory() {
   /** 取一条记录里各模块的有效得分（无效/未完成项不计入排名） */
   const extractItemScores = (rec) => {
     const patient = { name: rec.patientName, gender: rec.patientGender || '男', age: rec.patientAge, weight: rec.patientWeight };
-    const comp = buildComprehensiveScoreResult(rec.assessments || {}, patient);
+    const scoringAssessments = prepareAssessmentsForScoring(rec.assessments || {});
+    const comp = buildComprehensiveScoreResult(scoringAssessments, patient);
     const itemScores = {};
     (comp.itemResults || []).forEach(it => {
       if (rec.assessments?.[it.type]?.completed && !it.invalid && it.score > 0) {
@@ -184,8 +189,9 @@ export default function AssessmentHistory() {
       indexEntries[rec.id] = itemScores;
       perRecord.push({ id: rec.id, sessionId: rec.sessionId, name: rec.patientName, itemScores });
     }
-    setRecordScoresBatch(indexEntries, true);          // ① 整表替换得分索引（一次落盘）
-    const dist = rebuildDistributionFromIndex();        // ② 由索引聚合频次表（一次落盘）
+    const scoreIndex = setRecordScoresBatch(indexEntries, true); // ① 整表替换得分索引（一次落盘）
+    const dist = rebuildDistributionFromIndex(scoreIndex);       // ② 由索引聚合频次表（一次落盘）
+    markScoreCacheCurrent();
 
     const nextRank = {};
     for (const r of perRecord) {
@@ -199,6 +205,18 @@ export default function AssessmentHistory() {
     return { records, perRecord, nextRank, dist };
   }, []);
 
+  // 报告字段或单位口径升级后，旧缓存不能继续参与排名；首次进入时全量重建一次。
+  useEffect(() => {
+    if (rankCacheReady) return;
+    let cancelled = false;
+    recalcAllScores()
+      .then(() => {
+        if (!cancelled) setRankCacheReady(true);
+      })
+      .catch((err) => console.error('升级评分排名缓存失败:', err));
+    return () => { cancelled = true; };
+  }, [rankCacheReady, recalcAllScores]);
+
   /**
    * 进入历史页 / 翻页 / 搜索后，只为【当前页这 10 条】显示徽章：
    *   优先直接查「得分索引」（纯内存查表，不碰报告数据）；
@@ -206,7 +224,7 @@ export default function AssessmentHistory() {
    * 这样常态下进页面 = 两次查表，与总记录数、报告体积都无关。
    */
   useEffect(() => {
-    if (!items.length) return;
+    if (!rankCacheReady || !items.length) return;
     let cancelled = false;
     (async () => {
       try {
@@ -237,7 +255,7 @@ export default function AssessmentHistory() {
       }
     })();
     return () => { cancelled = true; };
-  }, [items]);
+  }, [items, rankCacheReady]);
 
   const handleFilesSelected = useCallback(async (e) => {
     const files = Array.from(e.target.files || []);

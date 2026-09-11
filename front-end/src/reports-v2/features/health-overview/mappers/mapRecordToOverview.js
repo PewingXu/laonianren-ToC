@@ -11,6 +11,7 @@ import {
 } from './assessmentMappers';
 
 function buildHeroView(abilities, narrative) {
+  const completedAbilities = abilities.filter((ability) => ability.available);
   const availableAbilities = abilities.filter((ability) => (
     ability.available
     && Number.isFinite(ability.score)
@@ -22,14 +23,17 @@ function buildHeroView(abilities, narrative) {
     : 0;
 
   if (availableAbilities.length === 0) {
+    const hasCompletedAssessment = completedAbilities.length > 0;
     return {
       ...staticContent.hero,
       state: 'unavailable',
       hasScore: false,
       score: 0,
-      title: '完成评估后，再一起看看身体状态',
-      content: '当前没有可用于综合判断的评估数据，完成至少一项评估后将生成专属总结。',
-      status: '暂无可评估数据',
+      title: hasCompletedAssessment ? '本次数据暂不足以综合评分' : '完成评估后，再一起看看身体状态',
+      content: hasCompletedAssessment
+        ? `已有 ${completedAbilities.length} 项评估记录，但有效数据暂不足以形成综合评分，请查看各项结果并按提示复测。`
+        : '当前没有可用于综合判断的评估数据，完成至少一项评估后将生成专属总结。',
+      status: hasCompletedAssessment ? '数据不足' : '暂无可评估数据',
     };
   }
 

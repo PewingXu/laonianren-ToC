@@ -26,6 +26,7 @@ function SummaryIcon({ children, className = '' }) {
 
 function overallTitle(hero) {
   if (!hero || hero.status === '数据不足') return '本次站立能力数据不足';
+  if (hero.status === '数据异常') return '本次站立数据无法形成可靠结论';
   if (hero.status === '已完成') return '本次站立能力评估已完成';
   return `您的站立能力处于${hero.status}范围`;
 }
@@ -40,16 +41,22 @@ function OverallSummary({ hero, summary }) {
   );
 }
 
-function HealthAttention({ hasData }) {
+function healthAttentionText(hero) {
+  if (!hero || hero.status === '数据不足' || hero.status === '数据异常') {
+    return '站立数据尚不完整，暂不能判断当前状态。下肢力量和身体稳定能力是保持独立活动能力的重要基础。';
+  }
+  if (hero.status === '表现较好') {
+    return '本次站立能力表现较好。随着年龄增长，下肢力量和身体稳定能力仍是保持独立活动能力的重要基础。';
+  }
+  return `本次站立能力处于${hero.status}范围，建议重点关注报告中提示的承重、稳定或足底支撑问题。`;
+}
+
+function HealthAttention({ hero }) {
   return (
     <section className="standing-report__summary-attention">
       <h3>健康关注</h3>
       <SummaryIcon className="standing-report__summary-heart"><Heart /></SummaryIcon>
-      <p>
-        {hasData
-          ? '当前站立状态良好，但随着年龄增长，下肢力量和身体稳定能力是保持独立活动能力的重要基础。'
-          : '站立数据尚不完整，暂不能判断当前状态。下肢力量和身体稳定能力是保持独立活动能力的重要基础。'}
-      </p>
+      <p>{healthAttentionText(hero)}</p>
       <hr />
       <p>建议保持规律训练，持续关注身体能力变化。</p>
     </section>
@@ -89,12 +96,10 @@ function StandingAdvice({ advice }) {
 }
 
 export function StandingSummary({ hero, summary, advice = [] }) {
-  const hasData = hero?.status !== '数据不足';
-
   return (
     <section
       className="standing-report__summary"
-      aria-label="AI健康总结与个性化建议"
+      aria-label="AI 健康总结与个性化建议"
     >
       <article
         className="standing-report__evaluation-panel"
@@ -102,11 +107,11 @@ export function StandingSummary({ hero, summary, advice = [] }) {
       >
         <div className="standing-report__summary-header">
           <SummaryIcon className="standing-report__summary-header-icon"><Bot /></SummaryIcon>
-          <h2 id="standing-ai-summary-title">AI健康总结</h2>
+          <h2 id="standing-ai-summary-title">AI 健康总结</h2>
         </div>
         <div className="standing-report__summary-grid">
           <OverallSummary hero={hero} summary={summary} />
-          <HealthAttention hasData={hasData} />
+          <HealthAttention hero={hero} />
         </div>
       </article>
       <StandingAdvice advice={advice} />

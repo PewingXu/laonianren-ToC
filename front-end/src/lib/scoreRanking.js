@@ -22,6 +22,8 @@
  */
 const KEY = 'sarcopenia_score_distribution';
 const INDEX_KEY = 'sarcopenia_score_index';
+const VERSION_KEY = 'sarcopenia_score_contract_version';
+export const SCORE_CONTRACT_VERSION = 'standing-gait-report-v2';
 export const RANK_TYPES = ['grip', 'sitstand', 'standing', 'gait'];
 
 function emptyDist() {
@@ -30,8 +32,25 @@ function emptyDist() {
 
 /* ─── ② 得分索引：记录ID → 各项得分 ─── */
 
+export function isScoreCacheCurrent() {
+  try {
+    return localStorage.getItem(VERSION_KEY) === SCORE_CONTRACT_VERSION;
+  } catch {
+    return false;
+  }
+}
+
+export function markScoreCacheCurrent() {
+  try {
+    localStorage.setItem(VERSION_KEY, SCORE_CONTRACT_VERSION);
+  } catch (e) {
+    console.error('保存评分口径版本失败:', e);
+  }
+}
+
 export function loadScoreIndex() {
   try {
+    if (!isScoreCacheCurrent()) return {};
     const raw = localStorage.getItem(INDEX_KEY);
     const obj = raw ? JSON.parse(raw) : {};
     return obj && typeof obj === 'object' ? obj : {};
@@ -102,6 +121,7 @@ export function rebuildDistributionFromIndex(index = null) {
 
 export function loadDistribution() {
   try {
+    if (!isScoreCacheCurrent()) return emptyDist();
     const raw = localStorage.getItem(KEY);
     if (!raw) return emptyDist();
     return { ...emptyDist(), ...JSON.parse(raw) };
@@ -205,6 +225,7 @@ export function clearDistribution() {
   try {
     localStorage.removeItem(KEY);
     localStorage.removeItem(INDEX_KEY);
+    localStorage.removeItem(VERSION_KEY);
   } catch (e) {
     console.error('清空评分频次表失败:', e);
   }

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { AI_ENABLED } from '../../lib/featureFlags';
+import { AI_ENABLED } from '../../lib/featureFlags.js';
 
 /**
  * 通用的报告 AI 文案 hook（起坐 / 站立 / 步态共用）。
@@ -36,13 +36,33 @@ export function useAssessmentAiCopy({
   const requestedKeyRef = useRef(null);
 
   useEffect(() => {
-    if (!AI_ENABLED || !facts) return undefined;
+    if (!AI_ENABLED) return undefined;
+    if (!facts) {
+      requestedKeyRef.current = null;
+      setState((current) => (
+        current.copy || current.status !== 'idle'
+          ? { copy: null, status: 'idle' }
+          : current
+      ));
+      return undefined;
+    }
 
     // 数据无效时不请求：报告本身已经写明「数据异常、请重测」，
     // 再让 AI 编一段安慰话只会稀释这个结论
-    if (facts.is_valid === false) return undefined;
+    if (facts.is_valid === false) {
+      requestedKeyRef.current = null;
+      setState((current) => (
+        current.copy || current.status !== 'idle'
+          ? { copy: null, status: 'idle' }
+          : current
+      ));
+      return undefined;
+    }
 
-    const key = JSON.stringify(keyFields.map((field) => facts[field] ?? null));
+    const key = JSON.stringify({
+      patient: [patientInfo?.gender ?? null, patientInfo?.age ?? null],
+      facts: keyFields.map((field) => facts[field] ?? null),
+    });
     if (requestedKeyRef.current === key) return undefined;
     requestedKeyRef.current = key;
 
@@ -114,14 +134,22 @@ export function validateSitStandCopy(payload) {
   return { health: validHealth, advice: validAdvice };
 }
 
-/** 站立：evaluation（一整段字符串）+ advice[3]{id,title,detail} */
-const STANDING_ADVICE_IDS = ['balance', 'posture', 'footcare'];
+/** 站立：evaluation + healthSummary{title,body,focusBody} + advice[3]{id,title,detail} */
+// ID 由前端按位置钉死，并与 StandingSummary 的图标契约保持一致。
+const STANDING_ADVICE_IDS = ['activity', 'posture', 'strength'];
 
 export function validateStandingCopy(payload) {
   if (!payload || typeof payload !== 'object') return null;
 
   // mapper 读的是 data.evaluation 且用 textOr —— 必须是字符串，对象会被丢弃
   const evaluation = text(payload.evaluation);
+  const healthTitle = text(payload.healthSummary?.title);
+  const healthBody = text(payload.healthSummary?.body);
+  const healthFocusBody = text(payload.healthSummary?.focusBody);
+  // 旧接口或不完整的 AI 总结使用整块本地文案，不拼接旧版技术说明。
+  const healthSummary = healthTitle && healthBody && healthFocusBody
+    ? { title: healthTitle, body: healthBody, focusBody: healthFocusBody }
+    : null;
 
   const rawAdvice = Array.isArray(payload.advice) ? payload.advice : [];
   const advice = STANDING_ADVICE_IDS.map((id, index) => {
@@ -132,12 +160,13 @@ export function validateStandingCopy(payload) {
   });
   const validAdvice = advice.every(Boolean) ? advice : null;
 
-  if (!evaluation && !validAdvice) return null;
-  return { evaluation: evaluation || null, advice: validAdvice };
+  if (!evaluation && !healthSummary && !validAdvice) return null;
+  return { evaluation: evaluation || null, healthSummary, advice: validAdvice };
 }
 
 /**
  * 步态：assessmentSummary{body,strength} + scoreExplanation
+ *      + healthSummary{title,body,focusBody}（报告末尾的日常活动解读）
  *      + recommendations[3]{id,title,description,icon,tone}
  * icon/tone 是白名单（walking|stretch|water / green|orange|blue），
  * 任一条不合规 mapRecommendations 就返回 [] —— 所以这里也按位置钉死。
@@ -154,6 +183,13 @@ export function validateGaitCopy(payload) {
   const body = text(payload.assessmentSummary?.body);
   const strength = text(payload.assessmentSummary?.strength);
   const explanation = text(payload.scoreExplanation);
+  const healthTitle = text(payload.healthSummary?.title);
+  const healthBody = text(payload.healthSummary?.body);
+  const healthFocusBody = text(payload.healthSummary?.focusBody);
+  // 末尾总结须完整返回；缺字段时整块使用本地文案，避免混搭出不连贯的建议。
+  const healthSummary = healthTitle && healthBody && healthFocusBody
+    ? { title: healthTitle, body: healthBody, focusBody: healthFocusBody }
+    : null;
 
   const raw = Array.isArray(payload.recommendations) ? payload.recommendations : [];
   const recommendations = raw.length === GAIT_RECOMMENDATIONS.length
@@ -169,10 +205,11 @@ export function validateGaitCopy(payload) {
     ? recommendations
     : null;
 
-  if (!body && !strength && !explanation && !validRecommendations) return null;
+  if (!body && !strength && !explanation && !healthSummary && !validRecommendations) return null;
   return {
     assessmentSummary: body || strength ? { body, strength } : null,
     scoreExplanation: explanation || null,
+    healthSummary,
     recommendations: validRecommendations,
   };
 }

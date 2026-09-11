@@ -11,6 +11,7 @@ import {
   buildStandingAiPayload,
 } from '../../lib/assessmentAi';
 import { scoreStanding, scoreToAiContext } from '../../lib/assessmentScoring';
+import { prepareStandingReportScoreInput } from '../../lib/standingReportEnrich';
 import { AI_ENABLED } from '../../lib/featureFlags';
 
 /* ─── 蔡司风格 EChart 封装（增量更新，避免闪烁） ─── */
@@ -415,10 +416,10 @@ export default function StandingReport({ reportData, patientInfo, onClose, onAiR
       }
     };
   }, [reportData]);
-  const scoreResult = useMemo(
-    () => reportData ? scoreStanding(reportData) : null,
-    [reportData],
-  );
+  const scoreResult = useMemo(() => {
+    const scoreInput = prepareStandingReportScoreInput(reportData);
+    return scoreInput ? scoreStanding(scoreInput) : null;
+  }, [reportData]);
   const cleanAiReport = useMemo(() => sanitizeAiReport(aiReport), [aiReport]);
 
   useEffect(() => {

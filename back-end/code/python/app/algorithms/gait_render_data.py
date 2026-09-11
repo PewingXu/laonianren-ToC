@@ -79,6 +79,49 @@ def get_gait_params(result):
     return result.get('gaitParams', {})
 
 
+def get_direction_control(result):
+    """Return the measured plantar-footpath direction-control contract."""
+    value = result.get('directionControl') if isinstance(result, dict) else None
+    if isinstance(value, dict):
+        return value
+    return {
+        'scope': 'plantar_footpath_straightness_proxy',
+        'reference': 'parallel_footprint_centerlines',
+        'pathDeviationRmsCm': None,
+        'maxPathDeviationCm': None,
+        'sampleCount': 0,
+        'forwardSpanCm': None,
+        'quality': {
+            'valid': False,
+            'reason': 'missing_direction_control',
+            'confidence': None,
+        },
+    }
+
+
+def get_walking_stability(result):
+    """Return step-to-step timing and footprint-spacing consistency."""
+    value = result.get('walkingStability') if isinstance(result, dict) else None
+    if isinstance(value, dict):
+        return value
+    return {
+        'scope': 'step_to_step_footprint_consistency',
+        'reference': 'consecutive_alternating_footprints',
+        'stepTimeCvPercent': None,
+        'stepDistanceCvPercent': None,
+        'meanStepTimeSeconds': None,
+        'meanStepDistanceCm': None,
+        'sampleCount': 0,
+        'intervalCount': 0,
+        'forwardSpanCm': None,
+        'quality': {
+            'valid': False,
+            'reason': 'missing_walking_stability',
+            'confidence': None,
+        },
+    }
+
+
 def get_fpa_per_step(result):
     """
     【渲染区域】每步足偏角(FPA)
@@ -326,6 +369,21 @@ def get_footprint_heatmap_data(result):
     前端渲染: Canvas 热力图 + FPA角度线
     """
     return result.get('footprintHeatmapData', {'heatmap': [], 'fpaLines': [], 'width': 0, 'height': 0})
+
+
+def get_footprint_trail_data(result):
+    """Return peak-frame footprints positioned in the shared walkway coordinates."""
+    value = result.get('footprintTrail') if isinstance(result, dict) else None
+    if isinstance(value, dict):
+        return value
+    return {
+        'sensorSize': [0, 0],
+        'sensorPitchMm': None,
+        'steps': [],
+        'stepCount': 0,
+        'baselineCount': 0,
+        'quality': {'valid': False, 'reason': 'missing_peak_footprints'},
+    }
 
 
 # ============================================================

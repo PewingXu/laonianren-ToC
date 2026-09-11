@@ -1,14 +1,21 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ToastRegion } from '../../health-overview/components/ToastRegion';
 import { GaitAbilityGrid } from '../components/GaitAbilityGrid';
-import { GaitBodyInterpretation } from '../components/GaitBodyInterpretation';
+import { GaitAiGuidance } from '../components/GaitAiGuidance';
+import { GaitFootprintTrail } from '../components/GaitFootprintTrail';
 import { GaitHero } from '../components/GaitHero';
-import { GaitRecommendations } from '../components/GaitRecommendations';
+import { GaitKeyMetrics } from '../components/GaitKeyMetrics';
+import {
+  GaitLoadAnalysis,
+  GaitObservation,
+  GaitSymmetry,
+} from '../components/GaitMeasurementDetails';
+import { GaitReportFooter } from '../components/GaitReportFooter';
 import { GaitReportHeader } from '../components/GaitReportHeader';
 import { GaitReportState } from '../components/GaitReportState';
-import { GaitSummary } from '../components/GaitSummary';
 import { GaitTrend } from '../components/GaitTrend';
 import { useGaitReport } from '../hooks/useGaitReport';
+import { buildGaitHealthSummary } from '../mappers/buildGaitHealthSummary';
 import { mapGaitReport } from '../mappers/mapGaitReport';
 import { buildGaitAiFacts } from '../../../../lib/assessmentAiFacts';
 import { generateGaitTocAIReport } from '../../../../lib/gripPythonApi';
@@ -22,7 +29,29 @@ function buildShareSummary(data) {
   return `${data.patientName}的步态详细报告，检测时间${data.recordedAt}，${score}。`;
 }
 
-const AI_KEY_FIELDS = ['speed_mps', 'step_length_m', 'cadence_spm', 'score'];
+const AI_KEY_FIELDS = [
+  'speed_mps',
+  'step_length_m',
+  'cadence_spm',
+  'step_width_cm',
+  'double_support_s',
+  'step_length_diff',
+  'step_time_diff',
+  'step_time_cv_percent',
+  'step_distance_cv_percent',
+  'stability_valid_steps',
+  'stability_confidence',
+  'path_deviation_cm',
+  'max_path_deviation_cm',
+  'direction_valid_steps',
+  'direction_confidence',
+  'left_load_percent',
+  'right_load_percent',
+  'score',
+  'score_max',
+  'grade',
+  'red_flags',
+];
 
 export function GaitReportPage({ gateway, recordId, onShare }) {
   const [notification, setNotification] = useState({ id: 0, message: '' });
@@ -47,21 +76,7 @@ export function GaitReportPage({ gateway, recordId, onShare }) {
     keyFields: AI_KEY_FIELDS,
   });
 
-  /*
-   * 步态的 AI 文案分散在两处组件（GaitSummary 读 summary、
-   * GaitRecommendations 读 recommendations），这里先合成一份，
-   * 避免在 JSX 里写两遍三元表达式。
-   */
-  const summary = ai.copy?.assessmentSummary || ai.copy?.scoreExplanation
-    ? {
-      ...data?.summary,
-      ...(ai.copy.assessmentSummary?.body ? { body: ai.copy.assessmentSummary.body } : {}),
-      ...(ai.copy.assessmentSummary?.strength
-        ? { strength: ai.copy.assessmentSummary.strength }
-        : {}),
-      ...(ai.copy.scoreExplanation ? { explanation: ai.copy.scoreExplanation } : {}),
-    }
-    : data?.summary;
+  const healthSummary = ai.copy?.healthSummary ?? buildGaitHealthSummary(facts);
 
   useEffect(() => {
     if (!notification.message) return undefined;
@@ -104,27 +119,6 @@ export function GaitReportPage({ gateway, recordId, onShare }) {
     }
   }
 
-  function handleShowStandards() {
-    const target = document.getElementById('gait-professional-analysis');
-    if (!target) return;
-    target.scrollIntoView({ block: 'center' });
-    target.focus({ preventScroll: true });
-  }
-
-  function handleShowAbility(abilityId) {
-    const target = document.getElementById(`gait-ability-${abilityId}`);
-    if (!target) return;
-    target.scrollIntoView({ block: 'center', behavior: 'smooth' });
-  }
-
-  function handleViewHistory() {
-    notify('历史报告入口待与后端对接');
-  }
-
-  function handleBuildPlan() {
-    notify('运动计划功能待与后端对接');
-  }
-
   return (
     <>
       <div
@@ -140,31 +134,27 @@ export function GaitReportPage({ gateway, recordId, onShare }) {
         />
         <main className="gait-report__content" aria-label="步态详细报告内容">
           <GaitHero hero={data.hero} />
-          <GaitSummary
-            summary={summary}
-            onShowStandards={handleShowStandards}
+          <GaitKeyMetrics
+            metrics={data.keyMetrics}
           />
+          <GaitSymmetry rows={data.measurementDetails.symmetry} />
+          <GaitFootprintTrail trail={data.footprintTrail} />
+          <GaitObservation observation={data.measurementDetails.observation} />
+          <GaitLoadAnalysis signals={data.measurementDetails.signals} />
           <GaitAbilityGrid abilities={data.abilities} />
           <section
             className="gait-report__guidance-grid"
-            aria-label="步态建议与成长趋势"
+            aria-label="步态成长趋势"
           >
-            {/* mapper 在数据不全时返回 []，所以 AI 没回来这块本来就是空的 */}
-            <GaitRecommendations
-              recommendations={ai.copy?.recommendations ?? data.recommendations}
-              />
             <GaitTrend trend={data.trend} />
           </section>
-          <GaitBodyInterpretation
-            abilities={data.abilities}
-            hero={data.hero}
-            // 与上面的 GaitSummary 用同一份，避免同页两处文案不一致
-            summary={summary}
-            onShowAbility={handleShowAbility}
-            onViewHistory={handleViewHistory}
-            onBuildPlan={handleBuildPlan}
+          <GaitAiGuidance
+            healthSummary={healthSummary}
+            recommendations={ai.copy?.recommendations ?? data.recommendations}
+            pending={ai.status === 'loading'}
           />
         </main>
+        <GaitReportFooter footer={data.footer} />
       </div>
       <ToastRegion notification={notification} />
     </>

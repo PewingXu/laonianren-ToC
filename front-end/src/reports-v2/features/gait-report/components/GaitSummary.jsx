@@ -14,7 +14,7 @@ export function GaitSummary({ summary, onShowStandards }) {
             <span>较上次评估</span>
             <strong>
               {summary.changeScore === null ? null : <ArrowUp aria-hidden="true" />}
-              {summary.changeScore === null ? '数据不足' : `${summary.changeScore} 分`}
+              {summary.changeScore === null ? '暂未形成趋势' : `${summary.changeScore} 分`}
             </strong>
           </div>
           <i aria-hidden="true" />

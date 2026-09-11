@@ -338,6 +338,32 @@ def find_pressure_peak_interval(pressure_curve, threshold_ratio=0.8):
     return left_index, right_index
 
 
+# 静止站立取窗用：find_pressure_peak_interval 只保留峰值帧周围"连续"且 ≥ 峰值 80%
+# 的那一段。这对单步落地是对的（本就该取冲击峰），但 300+ 帧的安静站立里压力曲线
+# 逐帧在阈值上下抖动，连续段立刻断开——实测 341 帧里左脚只剩 2 帧、右脚只剩 1 帧，
+# 轨迹画不出来，椭圆也退化（短轴=0）。站立稳定性要看的是整段站立，不是某个峰。
+STANDING_MIN_CONTACT_RATIO = 0.2   # 相对该脚接触点数中位数
+STANDING_MIN_CONTACT_CELLS = 5     # 绝对下限，低于此无法得到稳定 COP
+
+
+def find_standing_contact_indexes(pressure_curve):
+    """返回该脚真正着地的所有帧下标（可不连续）。"""
+    counts = np.asarray(pressure_curve, dtype=float)
+    if counts.size == 0:
+        return []
+
+    loaded = counts[counts > 0]
+    if loaded.size == 0:
+        return []
+
+    # 用中位数而不是峰值做基准，避免单帧尖峰把阈值抬高。
+    threshold = max(
+        float(np.median(loaded)) * STANDING_MIN_CONTACT_RATIO,
+        STANDING_MIN_CONTACT_CELLS,
+    )
+    return [int(i) for i in np.flatnonzero(counts >= threshold)]
+
+
 def calculate_cop_corrected(pressure_grid, isRight):
     total_pressure = 0
     weighted_x = 0
@@ -366,20 +392,26 @@ def calculate_cop_corrected(pressure_grid, isRight):
 
 
 def calculate_cop_trajectories(df, left_curve, right_curve, threshold_ratio):
-    left_left_index, left_right_index = find_pressure_peak_interval(left_curve, threshold_ratio)
-    right_left_index, right_right_index = find_pressure_peak_interval(right_curve, threshold_ratio)
+    """静止站立的左右脚 COP 轨迹，取整段着地期。
+
+    threshold_ratio 保留在签名里只为兼容既有调用方，取窗已改用
+    find_standing_contact_indexes（原因见该函数注释）。
+    """
     left_serial_matrix_cop = []
     right_serial_matrix_cop = []
-    for index in range(left_left_index, left_right_index + 1):
-        matrix = [df.iloc[index]['data'][i * 64:(i + 1) * 64] for i in range(64)]
-        left_matrix = [row[:32] for row in matrix]
-        leftIn, rightIn = calculate_cop_corrected(left_matrix, False)
-        left_serial_matrix_cop.append([leftIn, rightIn])
-    for index in range(right_left_index, right_right_index + 1):
-        matrix = [df.iloc[index]['data'][i * 64:(i + 1) * 64] for i in range(64)]
-        right_matrix = [row[32:] for row in matrix]
-        leftIn, rightIn = calculate_cop_corrected(right_matrix, True)
-        right_serial_matrix_cop.append([leftIn, rightIn])
+    for curve, is_right, sink in (
+        (left_curve, False, left_serial_matrix_cop),
+        (right_curve, True, right_serial_matrix_cop),
+    ):
+        for index in find_standing_contact_indexes(curve):
+            matrix = [df.iloc[index]['data'][i * 64:(i + 1) * 64] for i in range(64)]
+            half = [row[32:] if is_right else row[:32] for row in matrix]
+            try:
+                cop_x, cop_y = calculate_cop_corrected(half, is_right)
+            except ValueError:
+                # 该帧这只脚没有压力：跳过这一帧即可，不该让整条轨迹作废。
+                continue
+            sink.append([cop_x, cop_y])
     return left_serial_matrix_cop, right_serial_matrix_cop
 
 
@@ -1249,6 +1281,80 @@ def calculate_feet_centers_and_distances(df, left, right):
         "dist_left_to_both": dist_left * STANDING_SPACING_CM if dist_left is not None else None,
         "dist_right_to_both": dist_right * STANDING_SPACING_CM if dist_right is not None else None
     }
+
+
+def calculate_peak_frame_center_control(cop_results, spacing_cm=STANDING_SPACING_CM):
+    """Calculate a peak-frame plantar-COP offset proxy.
+
+    This is deliberately not a whole-body center-of-mass measurement.  The
+    bilateral COP is compared with the unweighted midpoint of the left and
+    right foot COPs from the same peak-pressure frame.
+    """
+    frame_index = cop_results.get("frame_index") if isinstance(cop_results, dict) else None
+    result = {
+        "scope": "peak_frame_plantar_cop_proxy",
+        "reference": "bilateral_foot_cop_midpoint",
+        "frame_index": frame_index,
+        "lateral_offset_cm": None,
+        "longitudinal_offset_cm": None,
+        "magnitude_cm": None,
+        "lateral_direction": None,
+        "quality": {
+            "valid": False,
+            "reason": "incomplete_peak_frame_cop",
+        },
+    }
+
+    def finite_point(value):
+        if not isinstance(value, (list, tuple, np.ndarray)):
+            return None
+        try:
+            point = np.asarray(value, dtype=float)
+        except (TypeError, ValueError):
+            return None
+        if point.shape != (2,) or not np.all(np.isfinite(point)):
+            return None
+        return point
+
+    if not isinstance(cop_results, dict):
+        return result
+
+    left_cop = finite_point(cop_results.get("left_cop"))
+    right_cop = finite_point(cop_results.get("right_cop"))
+    both_cop = finite_point(cop_results.get("both_cop"))
+    if left_cop is None or right_cop is None or both_cop is None:
+        return result
+
+    reference_point = (left_cop + right_cop) / 2.0
+    longitudinal_signed_cm = float(
+        (both_cop[0] - reference_point[0]) * spacing_cm
+    )
+    lateral_offset_cm = float(
+        (both_cop[1] - reference_point[1]) * spacing_cm
+    )
+    longitudinal_offset_cm = abs(longitudinal_signed_cm)
+
+    direction_tolerance_cm = 1e-9
+    if lateral_offset_cm > direction_tolerance_cm:
+        lateral_direction = "right"
+    elif lateral_offset_cm < -direction_tolerance_cm:
+        lateral_direction = "left"
+    else:
+        lateral_offset_cm = 0.0
+        lateral_direction = "centered"
+    magnitude_cm = math.hypot(lateral_offset_cm, longitudinal_offset_cm)
+
+    result.update({
+        "lateral_offset_cm": lateral_offset_cm,
+        "longitudinal_offset_cm": longitudinal_offset_cm,
+        "magnitude_cm": magnitude_cm,
+        "lateral_direction": lateral_direction,
+        "quality": {
+            "valid": True,
+            "reason": None,
+        },
+    })
+    return result
 
 
 def calculate_region_pressures(section_coords, matrix):
@@ -2318,6 +2424,7 @@ def cal_cop_fromData(data_array, threshold_ratio=0.8, fps=42, r_radius=0.1, time
 
     # ✅ 使用峰值帧计算COP中心
     cop_results = calculate_feet_centers_and_distances(df, left_curve, right_curve)
+    center_control = calculate_peak_frame_center_control(cop_results)
 
     # 尺寸（基于峰值帧的max_area）
     x_left_coords = [coord[0] for coord in left_max_area]
@@ -2355,6 +2462,7 @@ def cal_cop_fromData(data_array, threshold_ratio=0.8, fps=42, r_radius=0.1, time
         'arch_features': arch_results,
         'additional_data': additional_data,
         'cop_time_series': calculate_cop_time_series(left_cop, right_cop, additional_data),
+        'center_control': center_control,
     }
 
     # 控制台摘要
