@@ -119,20 +119,20 @@ export function SitStandReportPage({ gateway, recordId, onShare }) {
           <SitStandHero hero={data.hero} />
           <SitStandMetricGrid metrics={data.metrics} />
           <SitStandDetailsPanel details={data.details} />
-          <section
-            className="sit-stand-report__evaluation-grid"
-            aria-label="AI健康总结与个性化建议"
-          >
-            <SitStandEvaluation
-              evaluation={ai.copy?.health
-                ? { ...data.evaluation, health: ai.copy.health }
-                : data.evaluation}
-              findings={data.hero.findings}
-            />
-            <SitStandAdvice advice={mergeAdvice(data.advice, ai.copy?.advice)} />
-          </section>
-          <SitStandReportFooter />
+          {/*
+            AI 总结与建议各自独立成节、纵向排列（照握力）。
+            之前把两者塞进一个 960px 定宽、333px 定高的横排 grid 里，
+            右侧建议栏只有 255px 宽，正文被压到 10px。
+          */}
+          <SitStandEvaluation
+            evaluation={ai.copy?.health
+              ? { ...data.evaluation, health: ai.copy.health }
+              : data.evaluation}
+            pending={ai.status === 'loading'}
+          />
+          <SitStandAdvice advice={mergeAdvice(data.advice, ai.copy?.advice)} />
         </main>
+        <SitStandReportFooter />
       </div>
       <ToastRegion notification={notification} />
     </>

@@ -2,19 +2,26 @@ import { ArrowLeft, CalendarDays, Share2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { buildOverviewRoute } from '../../health-overview/utils/reportRoute';
 
+/**
+ * 页头。DOM 结构照握力（GripReportHeader）：返回键 + 标题组包在 header-leading 里，
+ * 与右侧 header-actions 用 flex space-between 撑开。之前是三列 grid，
+ * 看起来一样但 CSS 没法和握力共用同一套值。
+ */
 export function SitStandReportHeader({ recordId, recordedAt, onShare, onShowDate }) {
   return (
     <header className="sit-stand-report__header">
-      <Link
-        className="sit-stand-report__icon-button sit-stand-report__back-button"
-        to={buildOverviewRoute(recordId)}
-        aria-label="返回总报告"
-      >
-        <ArrowLeft aria-hidden="true" />
-      </Link>
-      <div className="sit-stand-report__title-group">
-        <h1 className="sit-stand-report__page-title">起身详细报告</h1>
-        <p>检测时间：{recordedAt}</p>
+      <div className="sit-stand-report__header-leading">
+        <Link
+          className="sit-stand-report__icon-button sit-stand-report__back-button"
+          to={buildOverviewRoute(recordId)}
+          aria-label="返回总报告"
+        >
+          <ArrowLeft aria-hidden="true" />
+        </Link>
+        <div className="sit-stand-report__title-group">
+          <h1 className="sit-stand-report__page-title">起身详细报告</h1>
+          <p>检测时间：{recordedAt}</p>
+        </div>
       </div>
       <div className="sit-stand-report__header-actions">
         <button className="sit-stand-report__share-button" type="button" onClick={onShare}>

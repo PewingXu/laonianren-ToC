@@ -23,7 +23,15 @@
       "Bash(grep -vE \"toFixed|round|Math\\\\.|getHandForceN|toNumber|\\\\?\\\\?|===|!==|const |let |//\")",
       "Bash(printf '%s\\\\n' \"- [push 只推 xupeirong-develop]\\(feedback_push_only_own_branch.md\\) — merge / liuxinze-develop 不许碰，同事从 xupeirong-develop 合并\" >> \"C:C:\\\\Users\\\\Evan\\\\.claude\\\\projects\\\\d--juqiao-project-manage-laonianren-ToC\\\\memory\\\\MEMORY.md\" && echo \"=== MEMORY.md 现在 ===\" && cat \"C:C:\\\\Users\\\\Evan\\\\.claude\\\\projects\\\\d--juqiao-project-manage-laonianren-ToC\\\\memory\\\\MEMORY.md\")",
       "Bash(awk '/result = _parse_json_response|parsed = _parse_json_response|data = _parse_json_response/{f=1} f{print NR\": \"$0} /return/{if\\(f\\){exit}}' llm_service.py)",
-      "Bash(../../venv/Scripts/python.exe -c \"import py_compile; py_compile.compile\\('llm_service.py', doraise=True\\); print\\('py_compile OK'\\)\")"
+      "Bash(../../venv/Scripts/python.exe -c \"import py_compile; py_compile.compile\\('llm_service.py', doraise=True\\); print\\('py_compile OK'\\)\")",
+      "Bash(grep -vE \"^\\\\s*$\")",
+      "Bash(grep -vE \"^\\\\s*$|^\\\\s*/\\\\*|^\\\\s*\\\\*\")",
+      "Bash(awk '/^\\\\.sit-stand-report__metrics/{f=1} f&&/^\\\\.sit-stand-report__details/{exit} f' sit-stand-report.css)",
+      "Bash(grep -vE \"^\\\\s*$|^--$\")",
+      "Bash(awk '/^\\\\.sit-stand-report__details/{f=1} f&&/^\\\\.sit-stand-report__evaluation/{exit} f' sit-stand-report.css)",
+      "Bash(grep -vE \"^--$\")",
+      "Bash(awk '/^\\\\.sit-stand-report__evaluation/{f=1} f&&/^\\\\.sit-stand-report__footer/{exit} f' sit-stand-report.css)",
+      "Bash(awk '/^\\\\.sit-stand-report__footer/{f=1} f&&/^\\\\.sit-stand-report__page-state/{exit} f' styles/sit-stand-report.css)"
     ],
     "additionalDirectories": [
       "C:\\C:\\Users\\Evan\\.claude\\projects\\d--juqiao-project-manage-laonianren-ToC\\memory"

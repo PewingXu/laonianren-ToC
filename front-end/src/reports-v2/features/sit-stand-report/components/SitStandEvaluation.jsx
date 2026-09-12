@@ -1,89 +1,70 @@
-import {
-  Accessibility,
-  Bot,
-  ClipboardCheck,
-  Heart,
-  Scale,
-  ShieldCheck,
-} from 'lucide-react';
+import { Bot, CircleCheckBig, Sprout } from 'lucide-react';
 
-const FINDING_ICONS = {
-  accessibility: Accessibility,
-  scale: Scale,
-  shield: ShieldCheck,
-  'briefcase-medical': ClipboardCheck,
-};
+/**
+ * AI 健康总结。DOM 结构照握力（GripAiHealthSummary）：
+ *   标题行（机器人图标 + h2）
+ *   主结论块（对勾图标 + h3 + p）
+ *   分隔线
+ *   关注方向块（新芽图标 + h3 + p）
+ *
+ * 之前是一张 333px 定高的横排三栏面板（总体评价 / 本次检测发现 / 健康关注），
+ * 正文只有 10px，跟握力那张纵向、15px 正文的卡完全不是一个尺度。
+ *
+ * 起坐的数据形状是 health = { preface, result, details[3] }：
+ *   preface + result 拼成主标题，details[0..1] 拼成主正文，
+ *   details[2]（「接下来该做什么」）单独放到「关注方向」块。
+ * 「本次检测发现」那三条在首屏胶片里已经展示过，这里不再重复。
+ */
+export function SitStandEvaluation({ evaluation, pending = false }) {
+  const health = evaluation?.health ?? {};
+  const details = Array.isArray(health.details) ? health.details : [];
 
-function SummaryIcon({ children, className = '' }) {
+  const title = [health.preface, health.result].filter(Boolean).join('，') || '起身能力评估';
+  const body = details.slice(0, 2).join('') || '';
+  const focusBody = details[2] || '';
+
   return (
-    <span
-      className={`sit-stand-report__summary-icon ${className}`.trim()}
-      aria-hidden="true"
-    >
-      {children}
-    </span>
-  );
-}
-
-function OverallSummary({ health }) {
-  return (
-    <section className="sit-stand-report__summary-overview">
-      <h3>总体评价</h3>
-      <strong>{health.preface}{health.result}</strong>
-      <p>{health.details.join('')}</p>
-    </section>
-  );
-}
-
-function FindingsSummary({ findings }) {
-  return (
-    <section className="sit-stand-report__summary-findings">
-      <h3>本次检测发现</h3>
-      <ul>
-        {findings.slice(0, 3).map((finding) => {
-          const Icon = FINDING_ICONS[finding.icon] || ClipboardCheck;
-          return (
-            <li key={`${finding.title}-${finding.detail}`}>
-              <SummaryIcon><Icon /></SummaryIcon>
-              <div>
-                <h4>{finding.title}</h4>
-                <p>{finding.detail}</p>
-              </div>
-            </li>
-          );
-        })}
-      </ul>
-    </section>
-  );
-}
-
-function HealthAttention() {
-  return (
-    <section className="sit-stand-report__summary-attention">
-      <h3>健康关注</h3>
-      <SummaryIcon className="sit-stand-report__summary-heart"><Heart /></SummaryIcon>
-      <p>当前状态良好，但随着年龄增长，下肢力量和身体稳定能力是保持独立活动能力的重要基础。</p>
-      <hr />
-      <p>建议保持规律训练，持续关注身体能力变化。</p>
-    </section>
-  );
-}
-
-export function SitStandEvaluation({ evaluation, findings }) {
-  return (
-    <article
-      className="sit-stand-report__evaluation-panel"
+    <section
+      className="sit-stand-report__ai-summary"
       aria-labelledby="sit-stand-ai-summary-title"
+      aria-busy={pending || undefined}
     >
-      <div className="sit-stand-report__summary-header">
-        <SummaryIcon className="sit-stand-report__summary-header-icon"><Bot /></SummaryIcon>
-        <h2 id="sit-stand-ai-summary-title">AI健康总结</h2>
-      </div>
-      <div className="sit-stand-report__summary-grid">
-        <OverallSummary health={evaluation.health} />
-        <FindingsSummary findings={findings} />
-        <HealthAttention />
-      </div>
-    </article>
+      <article className="sit-stand-report__ai-summary-card">
+        <div className="sit-stand-report__ai-summary-title-row">
+          <span className="sit-stand-report__ai-summary-icon" aria-hidden="true">
+            <Bot />
+          </span>
+          <h2 id="sit-stand-ai-summary-title">AI 健康总结</h2>
+          {pending ? (
+            <span className="sit-stand-report__ai-summary-pending">正在生成…</span>
+          ) : null}
+        </div>
+
+        <div className="sit-stand-report__ai-summary-copy">
+          <span className="sit-stand-report__ai-summary-icon" aria-hidden="true">
+            <CircleCheckBig />
+          </span>
+          <div>
+            <h3>{title}</h3>
+            {body ? <p>{body}</p> : null}
+          </div>
+        </div>
+
+        {focusBody ? (
+          <>
+            <div className="sit-stand-report__ai-summary-divider" />
+            <div className="sit-stand-report__ai-summary-focus">
+              <span className="sit-stand-report__ai-summary-icon" aria-hidden="true">
+                <Sprout />
+              </span>
+              <div>
+                <h3>接下来怎么做</h3>
+                <p>{focusBody}</p>
+              </div>
+            </div>
+          </>
+        ) : null}
+      </article>
+    </section>
   );
 }

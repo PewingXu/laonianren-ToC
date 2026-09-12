@@ -12,7 +12,6 @@ body:has(.sit-stand-report) {
 }
 
 .sit-stand-report {
-  --sit-canvas: 960px;
   --sit-ink: #191d18;
   --sit-text: #41493f;
   --sit-muted: #8c8c8c;
@@ -26,13 +25,19 @@ body:has(.sit-stand-report) {
   --sit-orange: #f8a36d;
   --sit-purple: #a689b5;
   --sit-purple-soft: #f5f0f7;
+  /*
+   * 与握力报告（grip-report.css .grip-report）逐字对齐。
+   * 之前是 Microsoft YaHei 13px + 960px 画布 zoom 1.1833，同一份字号在两页
+   * 上实际显示大小差 18%，看起来根本不像一套报告。
+   */
   width: 1200px;
-  min-height: 1536px;
+  min-height: 100%;
   margin: 0 auto;
-  padding: 0;
+  overflow-x: hidden;
   color: var(--sit-ink);
-  font-family: "Microsoft YaHei", "PingFang SC", "Segoe UI", Arial, sans-serif;
-  font-size: 13px;
+  background: #faf9f6;
+  font-family: "Be Vietnam Pro", "PingFang SC", "Microsoft YaHei", sans-serif;
+  font-size: 14px;
   letter-spacing: 0;
 }
 
@@ -56,14 +61,31 @@ body:has(.sit-stand-report) {
   display: block;
 }
 
+/* ════════════════════════════════════════════════
+   页头 —— 与 grip-report.css 的 .grip-report__header* 逐字对齐
+   ════════════════════════════════════════════════ */
+
 .sit-stand-report__header {
-  display: grid;
+  display: flex;
   width: 100%;
   height: 70px;
-  grid-template-columns: 40px 1fr auto;
   align-items: center;
-  column-gap: 16px;
+  justify-content: space-between;
   padding: 0 32px;
+}
+
+.sit-stand-report__header-leading,
+.sit-stand-report__header-actions {
+  display: flex;
+  align-items: center;
+}
+
+.sit-stand-report__header-leading {
+  gap: 16px;
+}
+
+.sit-stand-report__header-actions {
+  gap: 12px;
 }
 
 .sit-stand-report__icon-button {
@@ -82,8 +104,6 @@ body:has(.sit-stand-report) {
 .sit-stand-report__icon-button svg {
   width: 21px;
   height: 21px;
-  fill: none;
-  stroke: var(--sit-ink);
   stroke-width: 2;
 }
 
@@ -101,12 +121,6 @@ body:has(.sit-stand-report) {
   line-height: 20px;
 }
 
-.sit-stand-report__header-actions {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
 .sit-stand-report__share-button {
   display: inline-flex;
   height: 42px;
@@ -119,15 +133,13 @@ body:has(.sit-stand-report) {
   background: rgba(255, 255, 255, 0.94);
   box-shadow: 0 6px 18px rgba(42, 53, 44, 0.055);
   font-size: 12px;
+  line-height: 20px;
   font-weight: 800;
 }
 
 .sit-stand-report__share-button svg {
   width: 19px;
   height: 19px;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 2;
 }
 
 .sit-stand-report__calendar-button {
@@ -136,9 +148,12 @@ body:has(.sit-stand-report) {
 }
 
 .sit-stand-report__content {
-  width: var(--sit-canvas);
-  margin-left: 27.0422535px;
-  zoom: 1.1833333333;
+  /* 去掉 960px 画布 + zoom 1.1833 的缩放方案，改成与握力一致的 1200px 直排 */
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  gap: 24px;
+  padding: 0 32px 48px;
 }
 
 /* ════════════════════════════════════════════════
@@ -355,198 +370,194 @@ body:has(.sit-stand-report) {
   color: var(--sit-green);
 }
 
+/* ════════════════════════════════════════════════
+   核心指标 —— 与 grip-report.css 的 .grip-report__metric* 逐字对齐
+   四张卡用固定行高的 grid（标题 / 数值 / 同龄对比 / 图表），
+   每一行落在同一条水平线上，与内容多少无关。
+   ════════════════════════════════════════════════ */
+
+.sit-stand-report__metrics-section > h3 {
+  margin: 0 0 16px;
+  padding: 0 8px;
+  font-size: 20px;
+  line-height: 28px;
+  font-weight: 700;
+}
+
 .sit-stand-report__metrics-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px;
-  margin-top: 22px;
+  gap: 16px;
 }
 
 .sit-stand-report__metric-card {
-  position: relative;
-  height: 397px;
+  display: flex;
+  min-width: 0;
+  min-height: 320px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
   overflow: hidden;
-  border: 1px solid var(--sit-line);
-  border-radius: 8px;
+  border-radius: 24px;
   background: var(--sit-panel);
-  box-shadow: 0 8px 24px rgba(45, 61, 47, 0.055);
-  padding: 25px 22px 17px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03);
+  padding: 24px;
+}
+
+.sit-stand-report__metric-main,
+.sit-stand-report__metric-footer {
+  width: 100%;
+}
+
+.sit-stand-report__metric-main {
+  display: grid;
+  grid-template-rows: 24px 48px 18px 1fr;
+  row-gap: 16px;
+  justify-items: center;
+  align-items: center;
 }
 
 .sit-stand-report__metric-header {
   display: flex;
   align-items: center;
-  gap: 11px;
+  gap: 8px;
+  margin-bottom: 0;
 }
 
-.sit-stand-report__metric-index {
+.sit-stand-report__metric-header > span {
   display: grid;
-  width: 25px;
-  height: 25px;
-  flex: 0 0 25px;
+  width: 24px;
+  height: 24px;
   place-items: center;
   border-radius: 50%;
-  color: #fff;
-  font-family: Arial, sans-serif;
-  font-size: 10px;
-  line-height: 1;
-}
-
-.sit-stand-report__metric-card--speed .sit-stand-report__metric-index {
   background: var(--sit-green);
+  color: #fff;
 }
 
-.sit-stand-report__metric-card--balance .sit-stand-report__metric-index {
-  background: var(--sit-blue);
+.sit-stand-report__metric-header svg {
+  width: 13px;
+  height: 13px;
 }
 
-.sit-stand-report__metric-card--stability .sit-stand-report__metric-index {
-  background: var(--sit-orange);
-}
-
-.sit-stand-report__metric-card--completion .sit-stand-report__metric-index {
-  background: var(--sit-purple);
-}
-
-.sit-stand-report__metric-title {
+.sit-stand-report__metric-header h4 {
   margin: 0;
-  font-size: 16.9014085px;
-  line-height: 23.6619718px;
-  font-weight: 900;
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 700;
 }
 
 .sit-stand-report__metric-value {
   display: flex;
-  height: 58px;
-  align-items: flex-end;
-  margin-top: 12px;
+  width: 100%;
+  height: 48px;
+  align-items: baseline;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 0;
 }
 
-.sit-stand-report__metric-number {
-  font-family: Arial, sans-serif;
-  font-size: 39px;
-  line-height: 1;
-  font-weight: 500;
+.sit-stand-report__metric-value strong {
+  min-width: 0;
+  color: var(--sit-green);
+  font-size: 40px;
+  line-height: 48px;
+  white-space: nowrap;
 }
 
 .sit-stand-report__metric-value > span {
-  margin: 0 0 5px 8px;
-  font-size: 11px;
-  font-weight: 800;
+  color: var(--sit-text);
+  font-size: 14px;
 }
 
-.sit-stand-report__metric-value em,
-.sit-stand-report__split-score em {
-  display: inline-flex;
-  height: 27px;
-  min-width: 64px;
-  align-items: center;
-  justify-content: center;
-  margin: 0 0 3px auto;
+.sit-stand-report__metric-value em {
+  flex: 0 0 auto;
+  align-self: center;
   border-radius: 999px;
   background: var(--sit-green-soft);
-  color: var(--sit-green-deep);
-  font-size: 14px;
-  font-style: normal;
-  font-weight: 900;
-}
-
-.sit-stand-report__metric-value--speed strong,
-.sit-stand-report__metric-value--speed > span {
+  padding: 4px 10px;
   color: var(--sit-green);
+  font-size: 12px;
+  line-height: 18px;
+  font-style: normal;
+  font-weight: 500;
+  white-space: nowrap;
 }
 
-.sit-stand-report__metric-value--stability strong,
-.sit-stand-report__metric-value--stability > span {
-  color: var(--sit-orange);
-}
-
-.sit-stand-report__metric-value--completion strong,
-.sit-stand-report__metric-value--completion > span {
-  color: var(--sit-purple);
+/* 双脚平衡卡没有单一数值，value 槽位只放状态胶片，居中 */
+.sit-stand-report__metric-value--balance {
+  align-items: center;
 }
 
 .sit-stand-report__metric-summary {
-  margin: 8px 0 0;
+  display: flex;
+  height: 18px;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
   color: var(--sit-text);
   font-size: 12px;
-  font-weight: 700;
+  line-height: 18px;
+  text-align: center;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  max-width: 100%;
 }
 
-.sit-stand-report__metric-summary b {
-  color: var(--sit-green-deep);
+.sit-stand-report__metric-summary strong {
+  color: var(--sit-green);
+}
+
+/* 四张卡的主色：与握力四卡同一套 绿 / 蓝 / 橙 / 紫 */
+.sit-stand-report__metric-card--balance .sit-stand-report__metric-header > span {
+  background: var(--sit-blue);
+}
+
+.sit-stand-report__metric-card--stability .sit-stand-report__metric-header > span {
+  background: var(--sit-orange);
+}
+
+.sit-stand-report__metric-card--stability .sit-stand-report__metric-value strong {
+  color: var(--sit-orange);
+}
+
+.sit-stand-report__metric-card--completion .sit-stand-report__metric-header > span {
+  background: var(--sit-purple);
+}
+
+.sit-stand-report__metric-card--completion .sit-stand-report__metric-value strong {
+  color: var(--sit-purple);
+}
+
+.sit-stand-report__metric-footer .sit-stand-report__metric-reference {
+  margin-top: 16px;
+  color: var(--sit-muted);
+  font-size: 11px;
+  line-height: 14px;
+  text-align: center;
+}
+
+.sit-stand-report__metric-reference p {
+  margin: 0;
+}
+
+/* 图表容器：占满 grid 的 1fr 行，图表自身宽度撑满 */
+.sit-stand-report__speed-gauge,
+.sit-stand-report__balance-visual,
+.sit-stand-report__stability-chart,
+.sit-stand-report__completion-chart {
+  width: 100%;
+  margin-top: 0;
 }
 
 .sit-stand-report__speed-gauge {
-  width: 100%;
-  height: 151px;
-  margin-top: 2px;
+  height: 120px;
   overflow: visible;
 }
 
-.sit-stand-report__gauge-track,
-.sit-stand-report__gauge-active {
-  fill: none;
-  stroke-width: 13;
-}
-
-.sit-stand-report__gauge-track {
-  stroke: var(--sit-green-soft);
-}
-
-.sit-stand-report__gauge-active {
-  stroke: url(#sitStandSpeedArc);
-}
-
-.sit-stand-report__gauge-needle {
-  fill: none;
-  stroke: var(--sit-muted);
-  stroke-width: 2;
-  stroke-linecap: round;
-}
-
-.sit-stand-report__gauge-center {
-  fill: #aab4a8;
-}
-
-.sit-stand-report__speed-gauge text {
-  fill: var(--sit-muted);
-  font-size: 10px;
-}
-
-.sit-stand-report__metric-range {
-  position: absolute;
-  right: 22px;
-  bottom: 75px;
-  left: 22px;
-  margin: 0;
-  color: var(--sit-muted);
-  font-size: 11px;
-}
-
-.sit-stand-report__detail-button {
-  position: absolute;
-  right: 17px;
-  bottom: 15px;
-  left: 17px;
-  display: flex;
-  height: 35px;
-  align-items: center;
-  justify-content: center;
-  border: 0;
-  border-radius: 999px;
-  background: #f8faf3;
-  color: var(--sit-ink);
-  font-size: 12px;
-  font-weight: 900;
-}
-
-.sit-stand-report__detail-button svg {
-  position: absolute;
-  right: 17px;
-  width: 14px;
-  height: 14px;
-  color: var(--sit-muted);
+.sit-stand-report__stability-chart,
+.sit-stand-report__completion-chart {
+  height: 110px;
 }
 
 .sit-stand-report__split-score {
@@ -636,13 +647,6 @@ body:has(.sit-stand-report) {
   fill: #fad0b5;
 }
 
-.sit-stand-report__stability-chart,
-.sit-stand-report__completion-chart {
-  width: 100%;
-  height: 142px;
-  margin-top: 11px;
-}
-
 .sit-stand-report__stability-chart polyline {
   fill: none;
   stroke: var(--sit-orange);
@@ -661,61 +665,41 @@ body:has(.sit-stand-report) {
   fill: url(#sitStandCompletionBars);
 }
 
-.sit-stand-report__details-panel {
-  height: 351px;
-  margin-top: 16px;
-  border: 1px solid var(--sit-line);
-  border-radius: 8px;
+/* ════════════════════════════════════════════════
+   专业数据分析 —— 与 grip-report.css 的 .grip-report__professional* /
+   .grip-report__analysis-card 逐字对齐。一项一张卡，各自撑高。
+   ════════════════════════════════════════════════ */
+
+.sit-stand-report__professional-analysis > h2 {
+  margin: 0 0 16px;
+  padding: 0 8px;
+  font-size: 20px;
+  line-height: 28px;
+  font-weight: 700;
+}
+
+.sit-stand-report__professional-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr));
+  align-items: stretch;
+  gap: 24px;
+}
+
+.sit-stand-report__analysis-card {
+  min-width: 0;
+  overflow: hidden;
+  border-radius: 24px;
   background: var(--sit-panel);
-  box-shadow: 0 8px 24px rgba(45, 61, 47, 0.055);
-  padding: 17px 15px 16px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03);
+  padding: 24px;
 }
 
-.sit-stand-report__details-panel > h2 {
-  margin: 0 0 12px;
-  font-size: 17.75px;
-  line-height: 1.45;
-  font-weight: 900;
-}
-
-.sit-stand-report__details-panel > h2:focus-visible {
-  border-radius: 2px;
-  outline: 3px solid rgba(125, 168, 216, 0.28);
-  outline-offset: 2px;
-}
-
-.sit-stand-report__details-grid {
-  display: grid;
-  height: 283px;
-  grid-template-columns: 47.5% 52.5%;
-}
-
-.sit-stand-report__detail-column {
-  min-width: 0;
-}
-
-.sit-stand-report__force-detail {
-  display: flex;
-  min-height: 283px;
-  flex-direction: column;
-  padding-left: 1px;
-  padding-right: 18.6px;
-  border-right: 1px solid var(--sit-line);
-}
-
-.sit-stand-report__details-analysis {
-  display: grid;
-  min-width: 0;
-  grid-template-rows: 126.8px 1fr;
-  row-gap: 13.5px;
-  padding-left: 15.2px;
-}
-
+/* 三个子组件的 h3 统一成握力 analysis-card h3 的规格 */
 .sit-stand-report__detail-column h3 {
-  margin: 0;
-  font-size: 13px;
-  line-height: 1.3;
-  font-weight: 900;
+  margin: 0 0 16px;
+  font-size: 18px;
+  line-height: 28px;
+  font-weight: 700;
 }
 
 .sit-stand-report__detail-column h3:focus-visible {
@@ -724,28 +708,32 @@ body:has(.sit-stand-report) {
   outline-offset: 2px;
 }
 
-.sit-stand-report__speed-bars {
-  width: 262px;
-  height: 101.5px;
-  overflow: visible;
+.sit-stand-report__detail-column {
+  min-width: 0;
 }
 
-.sit-stand-report__speed-detail h3 {
-  margin-bottom: 7.6px;
-}
-
-.sit-stand-report__speed-detail {
+/* 子组件内部的旧布局约束全部放开：不再按 47.5%/52.5% 或小数 px 硬切 */
+.sit-stand-report__force-detail,
+.sit-stand-report__speed-detail,
+.sit-stand-report__cv-detail {
   width: 100%;
+  min-height: 0;
+  padding: 0;
+  border: 0;
 }
 
 .sit-stand-report__speed-content {
   display: grid;
-  width: 430px;
-  max-width: 100%;
-  grid-template-columns: minmax(0, 262px) minmax(118px, 1fr);
+  width: 100%;
+  grid-template-columns: minmax(0, 1fr) minmax(120px, 40%);
   align-items: start;
-  justify-self: center;
-  column-gap: 20.3px;
+  column-gap: 20px;
+}
+
+.sit-stand-report__speed-bars {
+  width: 100%;
+  height: 120px;
+  overflow: visible;
 }
 
 .sit-stand-report__detail-grid-lines path,
@@ -760,7 +748,7 @@ body:has(.sit-stand-report) {
 .sit-stand-report__process-axis,
 .sit-stand-report__stage-labels {
   fill: var(--sit-muted);
-  font-size: 10px;
+  font-size: 11px;
 }
 
 .sit-stand-report__detail-bars rect {
@@ -769,45 +757,43 @@ body:has(.sit-stand-report) {
 
 .sit-stand-report__detail-bar-values {
   fill: var(--sit-text);
-  font-size: 11px;
-  font-weight: 800;
+  font-size: 12px;
+  font-weight: 700;
 }
 
 .sit-stand-report__detail-notes {
-  margin: 29.6px 0 0;
+  margin: 0;
 }
 
 .sit-stand-report__detail-notes p {
-  margin: 0;
+  margin: 0 0 6px;
   color: var(--sit-muted);
-  font-size: 10.15px;
-  line-height: 1.7;
+  font-size: 12px;
+  line-height: 18px;
 }
 
 .sit-stand-report__force-detail table {
   width: 100%;
-  margin-top: 13.5px;
+  margin: 0;
   border-collapse: collapse;
   table-layout: fixed;
   color: var(--sit-text);
-  font-size: 11.85px;
-  line-height: 1.5;
+  font-size: 13px;
+  line-height: 20px;
 }
 
 .sit-stand-report__force-detail th,
 .sit-stand-report__force-detail td {
-  height: auto;
-  padding: 14.35px 0;
+  padding: 12px 0;
   border-bottom: 1px solid var(--sit-line);
   text-align: center;
   white-space: nowrap;
 }
 
 .sit-stand-report__force-detail th {
-  padding-top: 3.4px;
-  padding-bottom: 11px;
+  padding-top: 0;
   color: var(--sit-text);
-  font-weight: 900;
+  font-weight: 700;
 }
 
 .sit-stand-report__force-detail th:first-child,
@@ -816,46 +802,35 @@ body:has(.sit-stand-report) {
 }
 
 .sit-stand-report__table-range {
-  margin: 15.2px 0 0;
+  margin: 16px 0 0;
   color: var(--sit-muted);
-  font-size: 10.15px;
-  line-height: 1.6;
-}
-
-.sit-stand-report__cv-detail {
-  border-top: 1px solid var(--sit-line);
-  padding-top: 13.5px;
-}
-
-.sit-stand-report__cv-detail h3 {
-  margin-bottom: 7.6px;
+  font-size: 12px;
+  line-height: 18px;
 }
 
 .sit-stand-report__cv-content {
   display: grid;
-  grid-template-columns: 196.1px 105px;
+  grid-template-columns: minmax(0, 1fr) minmax(110px, 36%);
   align-items: center;
-  justify-content: center;
   column-gap: 20px;
 }
 
 .sit-stand-report__cv-rings {
   display: flex;
-  min-height: 81px;
   align-items: center;
   justify-content: center;
-  gap: 40.6px;
+  gap: 28px;
 }
 
 .sit-stand-report__ring-block {
   position: relative;
-  width: 77.75px;
-  height: 77.75px;
+  width: 84px;
+  height: 84px;
 }
 
 .sit-stand-report__ring-block svg {
-  width: 77.75px;
-  height: 77.75px;
+  width: 84px;
+  height: 84px;
   transform: rotate(-90deg);
 }
 
@@ -871,13 +846,11 @@ body:has(.sit-stand-report) {
 .sit-stand-report__ring-value--blue {
   stroke: var(--sit-blue);
   stroke-dasharray: 190 220;
-  stroke-linecap: butt;
 }
 
 .sit-stand-report__ring-value--green {
   stroke: var(--sit-green);
   stroke-dasharray: 193 220;
-  stroke-linecap: butt;
 }
 
 .sit-stand-report__ring-block span {
@@ -886,15 +859,15 @@ body:has(.sit-stand-report) {
   display: grid;
   place-content: center;
   color: var(--sit-text);
-  font-size: 11px;
+  font-size: 12px;
   text-align: center;
 }
 
 .sit-stand-report__ring-block b {
   display: block;
   margin-top: 4px;
-  font-family: Arial, sans-serif;
-  font-size: 12.7px;
+  font-size: 15px;
+  font-weight: 700;
 }
 
 .sit-stand-report__ring-block:first-child b {
@@ -914,388 +887,307 @@ body:has(.sit-stand-report) {
 
 .sit-stand-report__cv-average {
   margin: 0;
+  color: var(--sit-muted);
+  font-size: 12px;
   text-align: center;
-  font-size: 11px;
 }
 
 .sit-stand-report__cv-average strong {
   display: block;
-  margin-top: 2.5px;
-  font-family: Arial, sans-serif;
-  font-size: 16.9px;
+  margin-top: 4px;
+  color: var(--sit-ink);
+  font-size: 22px;
+  line-height: 28px;
+  font-weight: 700;
 }
 
 .sit-stand-report__good-pill {
-  display: flex;
-  width: 91.3px;
-  height: 20.3px;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  margin: 8.5px auto 0;
+  margin: 10px auto 0;
   border-radius: 999px;
   background: var(--sit-green-soft);
-  color: var(--sit-green-deep);
-  font-size: 10.15px;
-  font-weight: 900;
+  padding: 4px 12px;
+  color: var(--sit-green);
+  font-size: 12px;
+  line-height: 18px;
+  font-weight: 500;
 }
 
 .sit-stand-report__cv-range {
-  margin: 9.3px 0 0;
+  margin: 16px 0 0;
   color: var(--sit-muted);
-  font-size: 9.3px;
-  line-height: 1.55;
-  text-align: center;
-}
-
-.sit-stand-report__trend-legend {
-  display: flex;
-  justify-content: flex-end;
-  gap: 17px;
-  margin-top: 20px;
-  color: var(--sit-muted);
-  font-size: 9px;
-}
-
-.sit-stand-report__trend-legend span::before {
-  content: "";
-  display: inline-block;
-  width: 9px;
-  height: 6px;
-  margin-right: 5px;
-  clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
-}
-
-.sit-stand-report__legend--blue::before {
-  background: var(--sit-blue);
-}
-
-.sit-stand-report__legend--green::before {
-  background: var(--sit-green);
-}
-
-.sit-stand-report__legend--purple::before {
-  background: var(--sit-purple);
-}
-
-.sit-stand-report__process-chart {
-  width: 100%;
-  height: 205px;
-  margin-top: 0;
-  overflow: visible;
-}
-
-.sit-stand-report__process-chart polyline {
-  fill: none;
-  stroke-width: 1.7;
-  stroke-linejoin: round;
-  stroke-linecap: round;
-}
-
-.sit-stand-report__process-series--blue polyline {
-  stroke: var(--sit-blue);
-}
-
-.sit-stand-report__process-series--green polyline {
-  stroke: var(--sit-green);
-}
-
-.sit-stand-report__process-series--purple polyline {
-  stroke: var(--sit-purple);
-}
-
-.sit-stand-report__process-series--blue circle {
-  fill: var(--sit-blue);
-}
-
-.sit-stand-report__process-series--green circle {
-  fill: var(--sit-green);
-}
-
-.sit-stand-report__process-series--purple circle {
-  fill: var(--sit-purple);
-}
-
-.sit-stand-report__source-note {
-  margin: -2px 0 0;
-  color: var(--sit-muted);
-  font-size: 9px;
+  font-size: 12px;
+  line-height: 18px;
   text-align: center;
 }
 
 .sit-stand-report__detail-empty {
   display: grid;
-  height: 240px;
+  min-height: 160px;
   place-items: center;
   margin: 0;
   color: var(--sit-muted);
-  font-size: 12px;
+  font-size: 13px;
 }
 
-.sit-stand-report__details-analysis .sit-stand-report__detail-empty {
-  height: 82px;
+/* ════════════════════════════════════════════════
+   AI 健康总结 —— 与 grip-report.css 的 .grip-report__ai-summary* 逐字对齐
+   ════════════════════════════════════════════════ */
+
+.sit-stand-report__ai-summary {
+  min-width: 0;
 }
 
-.sit-stand-report__evaluation-grid {
-  display: grid;
-  width: 960px;
-  height: 333px;
-  grid-template-columns: 693px 255px;
-  gap: 12px;
-  margin: 16px auto 0;
-}
-
-.sit-stand-report__evaluation-panel,
-.sit-stand-report__advice-panel {
-  height: 100%;
-  min-height: 0;
-  border: 1px solid var(--sit-line);
-  border-radius: 8px;
-  background: var(--sit-panel);
-  box-shadow: 0 8px 24px rgba(45, 61, 47, 0.055);
-}
-
-.sit-stand-report__evaluation-panel {
-  display: flex;
-  flex-direction: column;
-  padding: 16px 22px 19px 20px;
+.sit-stand-report__ai-summary-card {
   overflow: hidden;
+  border: 1px solid #dfe5df;
+  border-radius: 24px;
+  background: var(--sit-panel);
+  box-shadow:
+    0 14px 34px rgba(38, 55, 46, 0.07),
+    inset 0 0 30px rgba(232, 239, 233, 0.38);
+  padding: 28px 32px 26px;
 }
 
-.sit-stand-report__summary-header,
-.sit-stand-report__advice-header {
+.sit-stand-report__ai-summary-title-row,
+.sit-stand-report__ai-summary-copy,
+.sit-stand-report__ai-summary-focus {
   display: flex;
+  align-items: flex-start;
+}
+
+.sit-stand-report__ai-summary-title-row {
   align-items: center;
-}
-
-.sit-stand-report__summary-header {
   gap: 14px;
-  margin-bottom: 21px;
+  margin-bottom: 24px;
 }
 
-.sit-stand-report__summary-header h2,
-.sit-stand-report__advice-header h2 {
+.sit-stand-report__ai-summary-title-row h2 {
   margin: 0;
-  font-size: 18px;
-  line-height: 1.15;
+  font-size: 22px;
+  line-height: 30px;
   font-weight: 900;
+  letter-spacing: 0;
 }
 
-.sit-stand-report__summary-icon {
+.sit-stand-report__ai-summary-icon {
   display: grid;
-  width: 42px;
-  height: 42px;
-  flex: 0 0 42px;
+  width: 48px;
+  height: 48px;
+  flex: 0 0 48px;
   place-items: center;
   border-radius: 50%;
   background: var(--sit-green-soft);
   color: var(--sit-green);
 }
 
-.sit-stand-report__summary-icon svg {
-  width: 20px;
-  height: 20px;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 1.8;
+.sit-stand-report__ai-summary-icon svg {
+  width: 27px;
+  height: 27px;
+  stroke-width: 2.2;
 }
 
-.sit-stand-report__summary-header-icon svg {
-  width: 23px;
-  height: 23px;
-}
-
-.sit-stand-report__summary-grid {
-  display: grid;
-  flex: 1;
-  grid-template-columns: 34.5% 38% 27.5%;
-  align-items: center;
-  min-height: 0;
-}
-
-.sit-stand-report__summary-overview {
+.sit-stand-report__ai-summary-copy {
   min-width: 0;
-  padding: 9px 21px 8px 8px;
+  gap: 16px;
 }
 
-.sit-stand-report__summary-grid h3 {
+.sit-stand-report__ai-summary-copy > div,
+.sit-stand-report__ai-summary-focus > div {
+  min-width: 0;
+}
+
+.sit-stand-report__ai-summary-copy h3,
+.sit-stand-report__ai-summary-focus h3,
+.sit-stand-report__ai-summary-copy p,
+.sit-stand-report__ai-summary-focus p {
   margin: 0;
-  font-size: 12px;
-  line-height: 1.25;
+  letter-spacing: 0;
+  overflow-wrap: anywhere;
+}
+
+.sit-stand-report__ai-summary-copy h3 {
+  color: var(--sit-green);
+  font-size: 26px;
+  line-height: 36px;
   font-weight: 900;
 }
 
-.sit-stand-report__summary-overview strong {
-  display: block;
-  margin-top: 8px;
-  color: var(--sit-green-deep);
-  font-size: 17px;
-  line-height: 1.2;
-  font-weight: 900;
-}
-
-.sit-stand-report__summary-overview p {
-  margin: 15px 0 0;
+.sit-stand-report__ai-summary-copy p {
+  max-width: 700px;
+  margin-top: 14px;
   color: var(--sit-text);
-  font-size: 10px;
-  line-height: 2.05;
+  font-size: 16px;
+  line-height: 30px;
   font-weight: 500;
 }
 
-.sit-stand-report__summary-findings {
-  display: flex;
-  align-self: stretch;
-  min-width: 0;
-  flex-direction: column;
-  justify-content: center;
-  border-right: 1px solid var(--sit-line);
-  border-left: 1px solid var(--sit-line);
-  padding: 0 13px;
-}
-
-.sit-stand-report__summary-findings > h3 {
-  margin: 0 0 16px 7px;
-}
-
-.sit-stand-report__summary-findings ul {
-  display: flex;
-  flex-direction: column;
-  gap: 27px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.sit-stand-report__summary-findings li {
-  display: flex;
-  min-width: 0;
-  align-items: flex-start;
-  gap: 9px;
-}
-
-.sit-stand-report__summary-findings li > div {
-  min-width: 0;
-  padding-top: 4px;
-}
-
-.sit-stand-report__summary-findings h4,
-.sit-stand-report__advice-item h3 {
-  margin: 0;
-  color: var(--sit-ink);
-  font-size: 12px;
-  line-height: 1.2;
-  font-weight: 900;
-}
-
-.sit-stand-report__summary-findings p,
-.sit-stand-report__advice-item p {
-  margin: 5px 0 0;
-  color: var(--sit-text);
-  font-size: 10px;
-  line-height: 1.55;
-  font-weight: 500;
-}
-
-.sit-stand-report__summary-attention {
-  display: flex;
-  align-self: stretch;
-  min-width: 0;
-  flex-direction: column;
-  justify-content: center;
-  padding-left: 14px;
-}
-
-.sit-stand-report__summary-attention > h3 {
-  margin-bottom: 18px;
-}
-
-.sit-stand-report__summary-heart {
-  width: 44px;
-  height: 44px;
-  flex-basis: 44px;
-  align-self: center;
-  margin-bottom: 11px;
-}
-
-.sit-stand-report__summary-heart svg {
-  width: 21px;
-  height: 21px;
-}
-
-.sit-stand-report__summary-attention p {
-  margin: 0 0 14px 8px;
-  color: var(--sit-text);
-  font-size: 10px;
-  line-height: 2.05;
-  font-weight: 500;
-}
-
-.sit-stand-report__summary-attention p:last-child {
-  margin-bottom: 0;
-}
-
-.sit-stand-report__summary-attention hr {
-  width: 100%;
+.sit-stand-report__ai-summary-divider {
   height: 1px;
-  margin: 0 0 14px;
-  border: 0;
+  margin: 22px 0;
   background: var(--sit-line);
 }
 
-.sit-stand-report__advice-panel {
-  padding: 16px 15px 17px;
+.sit-stand-report__ai-summary-focus {
+  gap: 16px;
 }
 
-.sit-stand-report__advice-header {
-  gap: 11px;
-  margin-bottom: 25px;
+.sit-stand-report__ai-summary-focus h3 {
+  color: var(--sit-green);
+  font-size: 20px;
+  line-height: 28px;
+  font-weight: 900;
 }
 
-.sit-stand-report__advice-header h2 {
+.sit-stand-report__ai-summary-focus p {
+  margin-top: 8px;
+  color: var(--sit-text);
   font-size: 15px;
+  line-height: 28px;
+  font-weight: 500;
 }
 
-.sit-stand-report__advice-list {
+.sit-stand-report__ai-summary-pending {
+  margin-left: 10px;
+  border-radius: 999px;
+  background: var(--sit-green-soft);
+  padding: 3px 10px;
+  color: var(--sit-green);
+  font-size: 11px;
+  line-height: 16px;
+  font-weight: 600;
+}
+
+/* ════════════════════════════════════════════════
+   个性化改善建议 —— 与 grip-report.css 的 .grip-report__advice* 逐字对齐
+   起坐是 4 条建议（握力 3 条），所以网格 4 列；其余全部相同。
+   ════════════════════════════════════════════════ */
+
+.sit-stand-report__advice-section > h2 {
+  margin: 0 0 16px;
+  padding: 0 8px;
+  font-size: 20px;
+  line-height: 28px;
+  font-weight: 700;
+}
+
+.sit-stand-report__advice-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 24px;
+}
+
+.sit-stand-report__advice-card {
+  min-width: 0;
+  min-height: 212px;
+  border-top: 4px solid var(--sit-green);
+  border-radius: 24px;
+  background: var(--sit-panel);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03);
+  padding: 24px;
+}
+
+.sit-stand-report__advice-heading {
   display: flex;
-  flex-direction: column;
-  gap: 26px;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.sit-stand-report__advice-heading > svg {
+  width: 32px;
+  height: 32px;
+  color: var(--sit-green);
+}
+
+.sit-stand-report__advice-card h3 {
+  margin: 0;
+  font-size: 18px;
+  line-height: 28px;
+  font-weight: 700;
+}
+
+.sit-stand-report__advice-card ul {
+  display: grid;
+  gap: 12px;
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
-.sit-stand-report__advice-item {
+.sit-stand-report__advice-card li {
   display: flex;
-  min-width: 0;
   align-items: flex-start;
-  gap: 17px;
+  gap: 8px;
+  color: var(--sit-text);
+  font-size: 14px;
+  line-height: 22px;
 }
 
-.sit-stand-report__advice-item > div {
-  min-width: 0;
-  padding-top: 2px;
+.sit-stand-report__advice-card li svg {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+  margin-top: 3px;
+  color: var(--sit-green);
 }
+
+.sit-stand-report__advice-card--blue {
+  border-top-color: var(--sit-blue);
+}
+
+.sit-stand-report__advice-card--blue .sit-stand-report__advice-heading > svg,
+.sit-stand-report__advice-card--blue li svg {
+  color: var(--sit-blue);
+}
+
+.sit-stand-report__advice-card--orange {
+  border-top-color: var(--sit-orange);
+}
+
+.sit-stand-report__advice-card--orange .sit-stand-report__advice-heading > svg,
+.sit-stand-report__advice-card--orange li svg {
+  color: var(--sit-orange);
+}
+
+.sit-stand-report__advice-card--purple {
+  border-top-color: var(--sit-purple);
+}
+
+.sit-stand-report__advice-card--purple .sit-stand-report__advice-heading > svg,
+.sit-stand-report__advice-card--purple li svg {
+  color: var(--sit-purple);
+}
+
+/* ════════════════════════════════════════════════
+   页脚 —— 与 grip-report.css 的 .grip-report__footer 逐字对齐
+   ════════════════════════════════════════════════ */
 
 .sit-stand-report__footer {
-  display: flex;
-  height: 57px;
-  align-items: center;
-  gap: 8px;
-  padding: 0 8px;
+  margin-top: 48px;
+  border-top: 1px solid #dde1d9;
+  padding: 32px;
   color: var(--sit-muted);
-}
-
-.sit-stand-report__footer svg {
-  width: 18px;
-  height: 18px;
-  flex: 0 0 18px;
-  fill: none;
-  stroke: var(--sit-green);
-  stroke-width: 2;
+  font-size: 12px;
+  line-height: 20px;
+  text-align: center;
 }
 
 .sit-stand-report__footer p {
-  margin: 0;
-  font-size: 11px;
+  max-width: 680px;
+  margin: 0 auto;
+}
+
+.sit-stand-report__footer p:first-child {
+  margin-bottom: 8px;
+  color: var(--sit-text);
+  font-size: 14px;
+}
+
+.sit-stand-report__footer p:nth-child(2) {
+  margin-bottom: 16px;
 }
 
 .sit-stand-report--state {
