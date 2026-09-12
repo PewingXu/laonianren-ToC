@@ -6,6 +6,7 @@ import { HealthOverviewPage } from '../reports-v2/features/health-overview/pages
 import { createSessionReportGateway } from '../lib/localReportGateway';
 import { shareReportSummary, saveAssessmentReminder } from '../lib/reportBoundaries';
 import { buildComprehensiveScoreResult, ASSESSMENT_KEYS, COMPREHENSIVE_MAX_SCORE } from '../lib/assessmentScoring';
+import { prepareAssessmentsForScoring } from '../lib/reportScoringAdapter';
 // PDF 导出走 Chromium 原生打印（矢量、可搜索），不走 html2canvas
 import { ReportPdfButton, buildReportFileName } from '../lib/reportPdf';
 
@@ -348,7 +349,12 @@ export default function Dashboard() {
     };
   }, [patientInfo, institution, assessments]);
   const comprehensiveScore = useMemo(
-    () => currentRecord ? buildComprehensiveScoreResult(assessments, patientInfo || {}) : null,
+    () => currentRecord
+      ? buildComprehensiveScoreResult(
+        prepareAssessmentsForScoring(assessments),
+        patientInfo || {},
+      )
+      : null,
     [currentRecord, assessments, patientInfo],
   );
   /*

@@ -4,11 +4,13 @@
  * 交付包的页面只依赖两个方法（见 BACKEND_HANDOFF.md §3）：
  *   { getOverviewRecord(recordId), getAssessmentReport(type, { recordId, assessmentId }) }
  *
- * 交付包自带的 legacySoftwareGateway 走的是 backendBridge + HttpResult 拆包，这里不能用：
+ * 交付包自带的 legacySoftwareGateway 走的是 backendBridge + HttpResult 拆包，不能直接替代本地网关：
  * backendBridge 上虽然也有 getGripReport / getStandingReport / getGaitReport / getSitStandReport，
  * 但那四个方法打的是 /getHandPdf、/getDbHeatmap、/getFootPdf、/getSitAndFootPdf，
  * 入参是 { timestamp, collectName, assessmentId }，作用是拿原始采集数据重跑算法，
  * 返回 { code, data: { render_data } } —— 与交付包契约只是方法名相同、语义不同。
+ * 唯一的受控例外是历史步态报告：新算法字段缺失且存在真实 assessmentId 时，
+ * 调用 getGaitReport 重跑算法，并在本次返回值中合并足印、稳定性和方向控制结果。
  *
  * 本系统的报告数据实际来自 IndexedDB（historyService），而且记录结构与交付包
  * BACKEND_HANDOFF.md §5 要求的形状逐字一致（id / sessionId / patientName / patientGender /
@@ -19,6 +21,10 @@ import { getRecord, getHistory } from './historyService';
 import { getRecordScores, getRankIncludingSelf, getCount } from './scoreRanking';
 import { enrichGripReportData, buildGripTrend } from './gripReportEnrich';
 import { enrichSitStandReportData } from './sitStandReportEnrich';
+import { enrichStandingReportData } from './standingReportEnrich';
+import { enrichGaitReportData } from './gaitReportEnrich';
+import { backendBridge } from './BackendBridge';
+import { recoverGaitFootprintTrail } from './gaitFootprintTrailRecovery';
 
 /**
  * 全部详情报告类型。
@@ -110,6 +116,14 @@ function enrichReportData(type, reportData, context = {}) {
 
   let next = type === 'standing' ? withFlattenedArch(reportData) : reportData;
 
+  if (type === 'standing') {
+    next = enrichStandingReportData(next);
+  }
+
+  if (type === 'gait') {
+    next = enrichGaitReportData(next);
+  }
+
   /*
    * 握力：补 V3 评分、分档、参考线、CV、保持率。
    *
@@ -159,6 +173,7 @@ function patientOf(record) {
 function resolveAssessmentId(assessment, type, recordId) {
   const raw = assessment?.assessmentId;
   if (typeof raw === 'string' && raw.trim()) return raw;
+  if (typeof raw === 'number' && Number.isFinite(raw)) return String(raw);
   return `local:${recordId}:${type}`;
 }
 
@@ -205,23 +220,57 @@ function enrichRecord(record) {
   return { ...record, assessments };
 }
 
-export function createLocalReportGateway() {
+async function recoverGaitReportForRecord(report, record, {
+  client,
+  fallbackAssessmentId,
+} = {}) {
+  const storedAssessment = record?.assessments?.gait;
+  const recovered = await recoverGaitFootprintTrail(report, {
+    client,
+    assessmentId: storedAssessment?.assessmentId,
+    fallbackAssessmentId,
+    timestamp: storedAssessment?.completedAt || record?.updatedAt || record?.date || '',
+    collectName: record?.patientName || '',
+    bodyWeightKg: record?.patientWeight,
+  });
+  if (recovered === report) return report;
+
+  return {
+    ...recovered,
+    reportData: enrichReportData('gait', recovered.reportData, {
+      recordId: record?.id,
+      patient: patientOf(record),
+    }),
+  };
+}
+
+export function createLocalReportGateway({
+  recordReader = getRecord,
+  historyReader = getHistory,
+  gaitReportClient = backendBridge,
+} = {}) {
   return {
     /** 总览页数据源。记录结构已与交付包一致，读出来增强即可，无需字段映射。 */
     async getOverviewRecord(recordId) {
-      return enrichRecord(await getRecord(recordId));
+      return enrichRecord(await recordReader(recordId));
     },
 
-    async getAssessmentReport(type, { recordId } = {}) {
+    async getAssessmentReport(type, { recordId, assessmentId } = {}) {
       if (!REPORT_TYPES.includes(type)) {
         throw new TypeError(`Unsupported assessment report type: ${type}`);
       }
-      const record = await getRecord(recordId);
+      const record = await recordReader(recordId);
       if (!record) return null;
       // 握力趋势图要至少 6 条历史握力记录才显示（mapTrend 的硬校验），
       // 只在打开握力详情页时才多读一次历史，其余三项不付这个代价
-      const trend = type === 'grip' ? buildGripTrend(await getHistory()) : undefined;
-      return readAssessmentReport(record, type, { trend });
+      const trend = type === 'grip' ? buildGripTrend(await historyReader()) : undefined;
+      const report = readAssessmentReport(record, type, { trend });
+      if (type !== 'gait' || !report) return report;
+
+      return recoverGaitReportForRecord(report, record, {
+        client: gaitReportClient,
+        fallbackAssessmentId: assessmentId,
+      });
     },
   };
 }
@@ -240,7 +289,7 @@ export const localReportGateway = createLocalReportGateway();
  * 会用 record.id 生成 /history/report?id=&type= 的跳转链接。拿占位 id 拼出来的链接
  * 点进去必然是「未找到对应的记录」，所以这里必须取到真实 id。
  */
-export function createSessionReportGateway(sessionId) {
+export function createSessionReportGateway(sessionId, { gaitReportClient = backendBridge } = {}) {
   async function findRecord() {
     if (typeof sessionId !== 'string' || !sessionId.trim()) return null;
     const history = await getHistory();
@@ -258,7 +307,9 @@ export function createSessionReportGateway(sessionId) {
       const record = await findRecord();
       if (!record) return null;
       const trend = type === 'grip' ? buildGripTrend(await getHistory()) : undefined;
-      return readAssessmentReport(record, type, { trend });
+      const report = readAssessmentReport(record, type, { trend });
+      if (type !== 'gait' || !report) return report;
+      return recoverGaitReportForRecord(report, record, { client: gaitReportClient });
     },
   };
 }
@@ -329,6 +380,7 @@ export function createMemoryRecordGateway({
   institution,
   recordId,
   fallbackId = 'pending:memory',
+  gaitReportClient = backendBridge,
 } = {}) {
   // mapper 要求 record.id 非空；没落库时给个占位，它不会显示给用户
   const id = (typeof recordId === 'string' && recordId.trim()) ? recordId : fallbackId;
@@ -340,9 +392,12 @@ export function createMemoryRecordGateway({
     const reportData = reports?.[type];
     if (!isObject(reportData)) continue;
     const rawId = assessmentIds?.[type];
+    const normalizedId = typeof rawId === 'number' && Number.isFinite(rawId)
+      ? String(rawId)
+      : (typeof rawId === 'string' ? rawId.trim() : '');
     assessments[type] = {
       completed: true,
-      assessmentId: (typeof rawId === 'string' && rawId.trim()) ? rawId : `local:${id}:${type}`,
+      assessmentId: normalizedId || `local:${id}:${type}`,
       // recordId 为占位时 buildPeerComparison 查不到分数，同龄对比自然隐藏，不伪造
       report: {
         reportData: enrichReportData(type, reportData, {
@@ -374,7 +429,9 @@ export function createMemoryRecordGateway({
       if (!REPORT_TYPES.includes(requestedType)) {
         throw new TypeError(`Unsupported assessment report type: ${requestedType}`);
       }
-      return record?.assessments?.[requestedType]?.report ?? null;
+      const report = record?.assessments?.[requestedType]?.report ?? null;
+      if (requestedType !== 'gait' || !report || !record) return report;
+      return recoverGaitReportForRecord(report, record, { client: gaitReportClient });
     },
   };
 }

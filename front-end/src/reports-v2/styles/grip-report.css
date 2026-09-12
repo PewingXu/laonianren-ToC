@@ -198,6 +198,13 @@ body:has(.grip-report) {
   overflow-wrap: anywhere;
 }
 
+.grip-report__hero-title-tail {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  white-space: nowrap;
+}
+
 .grip-report__hero-summary h2 strong {
   color: var(--grip-green);
   font-weight: inherit;

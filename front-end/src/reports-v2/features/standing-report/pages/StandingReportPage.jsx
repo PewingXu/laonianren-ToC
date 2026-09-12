@@ -1,13 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ToastRegion } from '../../health-overview/components/ToastRegion';
+import { StandingAiGuidance } from '../components/StandingAiGuidance';
 import { StandingDetailsPanel } from '../components/StandingDetailsPanel';
 import { StandingHero } from '../components/StandingHero';
 import { StandingMetricGrid } from '../components/StandingMetricGrid';
 import { StandingReportFooter } from '../components/StandingReportFooter';
 import { StandingReportHeader } from '../components/StandingReportHeader';
 import { StandingReportState } from '../components/StandingReportState';
-import { StandingSummary } from '../components/StandingSummary';
 import { useStandingReport } from '../hooks/useStandingReport';
+import { buildStandingHealthSummary } from '../mappers/buildStandingHealthSummary';
 import { mapStandingReport } from '../mappers/mapStandingReport';
 import { buildStandingAiFacts } from '../../../../lib/assessmentAiFacts';
 import { generateStandingTocAIReport } from '../../../../lib/gripPythonApi';
@@ -21,7 +22,30 @@ function buildShareSummary(data) {
   return `${data.patientName}的站立详细报告，检测时间${data.recordedAt}，${score}。`;
 }
 
-const AI_KEY_FIELDS = ['left_percent', 'right_percent', 'sway_mm', 'score'];
+const AI_KEY_FIELDS = [
+  'left_percent',
+  'right_percent',
+  'sway_cm',
+  'cop_scope',
+  'center_control_scope',
+  'center_lateral_offset_cm',
+  'center_longitudinal_offset_cm',
+  'center_offset_magnitude_cm',
+  'center_lateral_direction',
+  'left_arch_index',
+  'right_arch_index',
+  'arch_note',
+  'left_forefoot_percent',
+  'left_midfoot_percent',
+  'left_heel_percent',
+  'right_forefoot_percent',
+  'right_midfoot_percent',
+  'right_heel_percent',
+  'score',
+  'score_max',
+  'grade',
+  'red_flags',
+];
 
 export function StandingReportPage({ gateway, recordId, onShare }) {
   const [notification, setNotification] = useState({ id: 0, message: '' });
@@ -33,7 +57,7 @@ export function StandingReportPage({ gateway, recordId, onShare }) {
     mapper: mapStandingReport,
   });
 
-  // AI 文案异步取；失败就一直用 mapper 的兜底，报告永远可读
+  // AI 文案异步取；等待或失败时，按实测结果生成通俗的本地总结。
   const facts = useMemo(
     () => (raw ? buildStandingAiFacts(raw, patient) : null),
     [raw, patient],
@@ -45,6 +69,7 @@ export function StandingReportPage({ gateway, recordId, onShare }) {
     validate: validateStandingCopy,
     keyFields: AI_KEY_FIELDS,
   });
+  const healthSummary = ai.copy?.healthSummary ?? buildStandingHealthSummary(facts);
 
   useEffect(() => {
     if (!notification.message) return undefined;
@@ -105,17 +130,14 @@ export function StandingReportPage({ gateway, recordId, onShare }) {
           <StandingHero hero={data.hero} />
           <StandingMetricGrid metrics={data.metrics} />
           <StandingDetailsPanel details={data.details} />
-          <StandingSummary
-            hero={data.hero}
-            summary={ai.copy?.evaluation
-              ? { ...data.summary, evaluation: ai.copy.evaluation }
-              : data.summary}
-            // 站立的 advice 在 mapper 里没有兜底（缺数据返回 []），
-            // 所以 AI 没回来时这块本来就是空的，直接用 AI 的即可
+          <StandingAiGuidance
+            healthSummary={healthSummary}
+            // AI 返回后替换本地文案；等待或失败时由末尾区块提供安全兜底。
             advice={ai.copy?.advice ?? data.advice}
+            pending={ai.status === 'loading'}
           />
-          <StandingReportFooter footer={data.footer} />
         </main>
+        <StandingReportFooter footer={data.footer} />
       </div>
       <ToastRegion notification={notification} />
     </>

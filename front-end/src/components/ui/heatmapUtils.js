@@ -43,14 +43,14 @@ export function bilinearUpsample(data, targetH, targetW) {
 
   for (let ty = 0; ty < targetH; ty++) {
     // 映射到源坐标
-    const sy = (ty + 0.5) * srcH / targetH - 0.5;
-    const sy0 = Math.max(0, Math.floor(sy));
+    const sy = Math.min(srcH - 1, Math.max(0, (ty + 0.5) * srcH / targetH - 0.5));
+    const sy0 = Math.floor(sy);
     const sy1 = Math.min(srcH - 1, sy0 + 1);
     const fy = sy - sy0;
 
     for (let tx = 0; tx < targetW; tx++) {
-      const sx = (tx + 0.5) * srcW / targetW - 0.5;
-      const sx0 = Math.max(0, Math.floor(sx));
+      const sx = Math.min(srcW - 1, Math.max(0, (tx + 0.5) * srcW / targetW - 0.5));
+      const sx0 = Math.floor(sx);
       const sx1 = Math.min(srcW - 1, sx0 + 1);
       const fx = sx - sx0;
 

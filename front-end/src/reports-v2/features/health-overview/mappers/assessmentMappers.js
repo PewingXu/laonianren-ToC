@@ -1,6 +1,10 @@
-import { staticContent } from '../data/staticContent';
-import { formatMetric } from '../utils/formatters';
-import { clampPercent, finiteOrNull } from '../utils/validators';
+import { staticContent } from '../data/staticContent.js';
+import { formatMetric } from '../utils/formatters.js';
+import { clampPercent, finiteOrNull } from '../utils/validators.js';
+import {
+  representativeStandingCop,
+  standingCopMetrics,
+} from '../../../../lib/standingCopContract.js';
 
 function isObject(value) {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -30,14 +34,23 @@ function unavailable(type) {
   };
 }
 
-function view(type, data, metrics, score) {
+function textOrNull(value) {
+  return typeof value === 'string' && value.trim() ? value.trim() : null;
+}
+
+function view(type, data, metrics, score, presentation = {}) {
   if (!data) {
     return unavailable(type);
   }
 
   const content = staticContent.abilities[type];
-  const normalizedScore = clampPercent(score);
-  const isGood = normalizedScore >= 80;
+  const normalizedScore = finiteOrNull(score) === null ? null : clampPercent(score);
+  const isGood = normalizedScore !== null && normalizedScore >= 80;
+  const statusLabel = textOrNull(presentation.statusLabel)
+    || (normalizedScore === null ? '数据不足' : (isGood ? content.status.good : content.status.caution));
+  const statusTone = normalizedScore === null
+    ? (statusLabel === '数据异常' ? 'caution' : 'muted')
+    : (isGood ? 'positive' : 'caution');
 
   return {
     type,
@@ -45,9 +58,9 @@ function view(type, data, metrics, score) {
     description: content.description,
     available: true,
     score: normalizedScore,
-    status: { label: isGood ? content.status.good : content.status.caution, tone: isGood ? 'positive' : 'caution' },
+    status: { label: statusLabel, tone: statusTone },
     metrics,
-    insight: content.insight,
+    insight: textOrNull(presentation.insight) || content.insight,
     image: content.image,
   };
 }
@@ -65,6 +78,13 @@ function nonNegativeOrNull(value) {
 function positiveOrNull(value) {
   const numericValue = finiteOrNull(value);
   return numericValue !== null && numericValue > 0 ? numericValue : null;
+}
+
+function percentOrNull(value) {
+  const numericValue = finiteOrNull(value);
+  return numericValue !== null && numericValue >= 0 && numericValue <= 100
+    ? numericValue
+    : null;
 }
 
 function relativeDifference(left, right) {
@@ -126,37 +146,35 @@ export function mapSitStandAssessment(assessment) {
   ], score);
 }
 
-function standingFootSources(data, side) {
-  const candidates = [
-    data,
-    data.arch_features,
-    data.additional_data,
-    data.arch_features?.additional_data,
-  ].filter(isObject);
-
-  return candidates
-    .map((candidate) => candidate[side] || candidate[`${side}Foot`] || candidate[`${side}_foot`])
-    .filter(isObject);
-}
-
-function footValue(foot, ...keys) {
-  for (const key of keys) {
-    const value = finiteOrNull(foot?.[key]);
-    if (value !== null) {
-      return value;
+function standingInsight(leftWeight, rightWeight, sway, usesRepresentativeFootCop, hasScore) {
+  const parts = [];
+  if (leftWeight !== null && rightWeight !== null) {
+    const difference = Math.abs(leftWeight - rightWeight);
+    if (difference <= 10) {
+      parts.push(`左右承重相差 ${formatMetric(difference, 1)}%，分布较接近`);
+    } else {
+      const heavierSide = leftWeight > rightWeight ? '左脚' : '右脚';
+      parts.push(`${heavierSide}承重较多，左右相差 ${formatMetric(difference, 1)}%`);
     }
   }
-  return null;
+  if (sway !== null) {
+    const copLabel = usesRepresentativeFootCop ? '代表侧单足 COP' : '整体 COP';
+    parts.push(`${copLabel} 最大摆动范围约 ${formatMetric(sway, 1)} mm`);
+  }
+  return parts.length
+    ? `${parts.join('；')}。`
+    : (hasScore
+      ? '本次已生成站立评分，但承重与 COP 摆动范围数据不足。'
+      : '本次站立数据不足，暂不能形成综合评分。');
 }
 
-function standingFootValue(footSources, ...keys) {
-  for (const foot of footSources) {
-    const value = footValue(foot, ...keys);
-    if (value !== null) {
-      return value;
-    }
-  }
-  return null;
+function gaitInsight(speed, stepLength, cadence, symmetry) {
+  const parts = [];
+  if (speed !== null) parts.push(`步速 ${formatMetric(speed, 2)} m/s`);
+  if (stepLength !== null) parts.push(`平均同脚步幅 ${formatMetric(stepLength, 2)} m`);
+  if (cadence !== null) parts.push(`步频 ${formatMetric(cadence, 0)} 步/分`);
+  if (symmetry !== null) parts.push(`同脚周期对称性 ${formatMetric(symmetry, 0)}%`);
+  return parts.length ? `${parts.join('，')}。` : '本次步态时空参数数据不足。';
 }
 
 export function mapStandingAssessment(assessment) {
@@ -165,26 +183,34 @@ export function mapStandingAssessment(assessment) {
     return unavailable('standing');
   }
 
-  const leftFeet = standingFootSources(data, 'left');
-  const rightFeet = standingFootSources(data, 'right');
-  const leftArch = standingFootValue(leftFeet, 'archIndex', 'arch_index');
-  const rightArch = standingFootValue(rightFeet, 'archIndex', 'arch_index');
-  const archValuesAreValid = [leftArch, rightArch].every((value) => value !== null && value >= 0 && value <= 1);
-  const archDifference = archValuesAreValid ? relativeDifference(leftArch, rightArch) : null;
-  if (archDifference === null) {
-    return unavailable('standing');
-  }
-  const sway = average(
-    nonNegativeOrNull(standingFootValue(leftFeet, 'sway', 'swayAmplitude', 'sway_amplitude')),
-    nonNegativeOrNull(standingFootValue(rightFeet, 'sway', 'swayAmplitude', 'sway_amplitude')),
-  );
-  const score = 100 - archDifference * 2;
+  const score = percentOrNull(data.score);
+  const weight = isObject(data.metrics?.weight) ? data.metrics.weight : {};
+  const leftWeight = percentOrNull(weight.leftPercent);
+  const rightWeight = percentOrNull(weight.rightPercent);
+  const hasWeight = leftWeight !== null
+    && rightWeight !== null
+    && Math.abs(leftWeight + rightWeight - 100) < 0.001;
+  const weightDifference = hasWeight ? Math.abs(leftWeight - rightWeight) : null;
+  const backendCop = representativeStandingCop(data);
+  const cop = standingCopMetrics(data);
+  const swayRanges = [
+    nonNegativeOrNull(cop.delta_x ?? cop.deltaX ?? cop.rangeX),
+    nonNegativeOrNull(cop.delta_y ?? cop.deltaY ?? cop.rangeY),
+  ].filter((value) => value !== null);
+  const sway = swayRanges.length ? Math.max(...swayRanges) : null;
+  const usesRepresentativeFootCop = Boolean(backendCop);
   const content = staticContent.abilities.standing.metrics;
+  const swayMetric = usesRepresentativeFootCop
+    ? { ...content.sway, label: '代表侧 COP 摆动范围' }
+    : content.sway;
 
   return view('standing', data, [
-    metric(content.balance, archDifference),
-    metric(content.sway, sway),
-  ], score);
+    metric(content.balance, weightDifference),
+    metric(swayMetric, sway),
+  ], score, {
+    statusLabel: data.status,
+    insight: standingInsight(leftWeight, rightWeight, sway, usesRepresentativeFootCop, score !== null),
+  });
 }
 
 export function mapGaitAssessment(assessment) {
@@ -195,19 +221,20 @@ export function mapGaitAssessment(assessment) {
 
   const params = isObject(data.gaitParams) ? data.gaitParams : {};
   const speed = positiveOrNull(params.walkingSpeed);
-  if (speed === null) {
-    return unavailable('gait');
-  }
+  const score = percentOrNull(data.score);
   const leftStepLength = nonNegativeOrNull(params.leftStepLength);
   const rightStepLength = nonNegativeOrNull(params.rightStepLength);
   const leftStepTime = positiveOrNull(params.leftStepTime);
   const rightStepTime = positiveOrNull(params.rightStepTime);
-  const strideLength = average(leftStepLength, rightStepLength);
+  const rhythm = isObject(data.abilities?.rhythm) ? data.abilities.rhythm : {};
+  const averageStepLengthCm = average(leftStepLength, rightStepLength);
+  const strideLength = positiveOrNull(rhythm.stepLengthM)
+    ?? (averageStepLengthCm === null ? null : averageStepLengthCm / 100);
   const stepTime = average(leftStepTime, rightStepTime);
-  const cadence = stepTime === null ? null : 60 / stepTime;
+  const cadence = positiveOrNull(rhythm.cadenceStepsPerMinute)
+    ?? (stepTime === null ? null : 120 / stepTime);
   const symmetryDifference = relativeDifference(leftStepTime, rightStepTime);
   const symmetry = symmetryDifference === null ? null : 100 - symmetryDifference;
-  const score = 100 - Math.abs(speed - 1.1) * 100;
   const content = staticContent.abilities.gait.metrics;
 
   return view('gait', data, [
@@ -215,5 +242,8 @@ export function mapGaitAssessment(assessment) {
     metric(content.length, strideLength),
     metric(content.cadence, cadence, 0),
     metric(content.symmetry, symmetry, 0),
-  ], score);
+  ], score, {
+    statusLabel: data.status,
+    insight: gaitInsight(speed, strideLength, cadence, symmetry),
+  });
 }

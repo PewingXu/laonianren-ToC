@@ -28,6 +28,7 @@ import {
   requestAssessmentAIReport,
 } from '../../lib/assessmentAi';
 import { scoreGait, scoreToAiContext } from '../../lib/assessmentScoring';
+import { prepareGaitReportScoreInput } from '../../lib/gaitReportEnrich';
 
 /* ─── 传感器常量 ─── */
 const SENSOR_KEYS = ['sensor1', 'sensor2', 'sensor3', 'sensor4'];
@@ -343,7 +344,10 @@ export function GaitReportContent({ patientInfo, pythonResult: externalResult, o
   const thStyle = 'px-3 py-2 text-left font-semibold text-[14px]';
   const tdStyle = 'px-3 py-2 text-[14px]';
   const aiPayload = useMemo(() => buildGaitAiPayload(realData), [realData]);
-  const scoreResult = useMemo(() => realData ? scoreGait(realData) : null, [realData]);
+  const scoreResult = useMemo(() => {
+    const scoreInput = prepareGaitReportScoreInput(realData);
+    return scoreInput ? scoreGait(scoreInput) : null;
+  }, [realData]);
   const cleanAiReport = useMemo(() => sanitizeAiReport(aiReport), [aiReport]);
 
   useEffect(() => {

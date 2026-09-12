@@ -1,4 +1,4 @@
-import { overviewImages } from '../assets';
+import { overviewImages } from '../assets.js';
 
 export const staticContent = Object.freeze({
   abilities: Object.freeze({
@@ -18,11 +18,11 @@ export const staticContent = Object.freeze({
       title: '步态能力',
       description: '行走时的稳定性和流畅度',
       status: Object.freeze({ good: '表现良好', caution: '仍有提升空间' }),
-      insight: '步速、步幅和对称性良好，行走节奏稳定，继续保持。',
+      insight: '请结合本次步速、同脚步幅、步频和周期对称性查看行走表现。',
       image: overviewImages.gait,
       metrics: Object.freeze({
         speed: Object.freeze({ label: '步速', unit: 'm/s', reference: '0.9-1.3', icon: 'gauge' }),
-        length: Object.freeze({ label: '步幅', unit: 'm', reference: '1.0-1.3', icon: 'ruler' }),
+        length: Object.freeze({ label: '同脚步幅', unit: 'm', reference: '1.0-1.3', icon: 'ruler' }),
         cadence: Object.freeze({ label: '步频', unit: '步/分', reference: '90-120', icon: 'footprints' }),
         symmetry: Object.freeze({ label: '对称性', unit: '%', reference: '> 85%', icon: 'scale' }),
       }),
@@ -30,12 +30,12 @@ export const staticContent = Object.freeze({
     standing: Object.freeze({
       title: '双脚稳定性',
       description: '站立时身体的稳定控制能力',
-      status: Object.freeze({ good: '表现良好', caution: '左脚多留意' }),
-      insight: '左脚重心偏移略大，身体晃动稍高，站立时需多留意。',
+      status: Object.freeze({ good: '表现良好', caution: '建议关注' }),
+      insight: '请结合本次左右承重差异和 COP 摆动范围查看站立表现。',
       image: overviewImages.standing,
       metrics: Object.freeze({
-        balance: Object.freeze({ label: '左右重心差异', unit: '%', reference: '0%-30%', icon: 'scale' }),
-        sway: Object.freeze({ label: '身体晃动幅度', unit: 'mm', reference: '0-30', icon: 'waves' }),
+        balance: Object.freeze({ label: '左右承重差异', unit: '%', reference: '0%-30%', icon: 'scale' }),
+        sway: Object.freeze({ label: 'COP 摆动范围', unit: 'mm', reference: '越小越稳定', icon: 'waves' }),
       }),
     }),
     grip: Object.freeze({

@@ -3,6 +3,8 @@ import { MaterialSymbol } from './MaterialSymbol';
 import { MetricItem } from './MetricItem';
 
 export function GaitAbilityCard({ ability, to, onOpenAbility }) {
+  const hasScore = Number.isFinite(ability.score);
+
   return (
     <AbilityCardShell ability={ability} index={2} to={to} onOpenAbility={onOpenAbility}>
       <div className="flex items-center gap-4 mb-4">
@@ -22,7 +24,7 @@ export function GaitAbilityCard({ ability, to, onOpenAbility }) {
               className="w-full h-full -rotate-90"
               viewBox="0 0 100 100"
               role="img"
-              aria-label={`综合表现 ${ability.score}%`}
+              aria-label={hasScore ? `综合表现 ${ability.score}%` : '综合表现数据不足'}
             >
               <circle cx="50" cy="50" fill="none" r="40" stroke="#EEF3FC" strokeWidth="12" />
               <circle
@@ -32,13 +34,13 @@ export function GaitAbilityCard({ ability, to, onOpenAbility }) {
                 r="40"
                 stroke="#4B79D3"
                 strokeDasharray="251.2"
-                strokeDashoffset={251.2 * (1 - ability.score / 100)}
+                strokeDashoffset={hasScore ? 251.2 * (1 - ability.score / 100) : 251.2}
                 strokeLinecap="round"
                 strokeWidth="12"
               />
             </svg>
             <div className="absolute inset-0 flex items-center justify-center font-bold text-xl">
-              {ability.score}%
+              {hasScore ? `${ability.score}%` : '--'}
             </div>
           </div>
           <span className="text-on-surface mt-1 text-sm">{ability.status.label}</span>

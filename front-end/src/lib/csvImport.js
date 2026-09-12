@@ -17,8 +17,8 @@
  *   起坐(3)   stand=foot4/foot1(4096, 北京优先foot4、广州优先foot1)，sit=sit_data(1024)；
  *             times=格式化时间串（无效 ts 行跳过）；各自连续同帧去重；不翻转
  *   静态(4)   北京取 foot4 且每帧上下翻转；广州取 foot1 不翻；fps=42；不去重
- *   步态(5)   foot1~4 四块同帧齐全才收，两地一致；board_data 每帧 JSON.stringify；
- *             board_times=4×格式化时间串（无效 ts 行跳过）；不去重
+ *   步态(5)   foot1~4 各自收集有效帧，兼容按设备异步写入的稀疏行；
+ *             board_data 每块独立 JSON.stringify，board_times 使用该块所在行的时间戳；不去重
  */
 
 export const SAMPLE_TYPE_TO_TYPE = { 1: 'grip', 3: 'sitstand', 4: 'standing', 5: 'gait' };
@@ -208,9 +208,9 @@ function buildStandingInput(rows, region) {
   return { data_array: oriented, fps: 42, threshold_ratio: 0.8 };
 }
 
-// 步态：foot1~4 四块同帧齐全才收（与端点一致）；两地线序一致。
-// 不做内容去重（同 standing 的理由：现代导出无重复行，内容去重会误折叠空垫/静止的合法帧）；
-// 时间戳无效的行跳过（防 NaN/1970 污染 board_times 导致 Python 时间对齐崩溃）。
+// 步态：四块脚垫各自收集，兼容 storageData 导出的异步稀疏行。
+// 不做内容去重，保留每块的原始时间序列，由 Python 统一按时间对齐。
+// 时间戳无效的行只影响当前脚垫，不连带丢掉同一行中的其他脚垫。
 function buildGaitInput(rows) {
   const cols = ['foot1_data', 'foot2_data', 'foot3_data', 'foot4_data'];
   const missing = cols.filter(c => !hasColumnData(rows, c));
@@ -218,17 +218,17 @@ function buildGaitInput(rows) {
 
   const data = [[], [], [], []];
   const times = [[], [], [], []];
-  for (const r of rows) {
-    if (!validTs(r.timestamp)) continue; // 无有效时间戳的帧无法参与时间对齐
-    const frames = cols.map(c => parseArrCell(r[c]));
-    if (frames.some(f => !f || !f.length)) continue; // 四块必须同帧齐全
-    const ts = formatTimestamp(r.timestamp);
-    for (let i = 0; i < 4; i++) {
-      data[i].push(frames[i]);
-      times[i].push(ts);
+  for (let i = 0; i < cols.length; i++) {
+    for (const r of rows) {
+      if (!validTs(r.timestamp)) continue;
+      const frame = parseArrCell(r[cols[i]]);
+      if (!frame || !frame.length) continue;
+      data[i].push(frame);
+      times[i].push(formatTimestamp(r.timestamp));
     }
   }
-  if (!data[0].length) throw new Error('步态数据无四块垫齐全的有效帧');
+  const empty = cols.filter((_, index) => !data[index].length);
+  if (empty.length) throw new Error(`步态数据缺少有效帧：${empty.join('、')}`);
 
   return {
     board_data: data.map(block => block.map(arr => JSON.stringify(arr))),

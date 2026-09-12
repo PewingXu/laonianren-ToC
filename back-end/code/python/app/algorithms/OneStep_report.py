@@ -8,6 +8,7 @@ import ast
 import numpy as np
 from matplotlib import image as mpimg
 from scipy.spatial.distance import euclidean, cdist
+from scipy.signal import butter, filtfilt
 # from tabulate import tabulate
 import seaborn as sns
 import matplotlib
@@ -338,6 +339,32 @@ def find_pressure_peak_interval(pressure_curve, threshold_ratio=0.8):
     return left_index, right_index
 
 
+# 静止站立取窗用：find_pressure_peak_interval 只保留峰值帧周围"连续"且 ≥ 峰值 80%
+# 的那一段。这对单步落地是对的（本就该取冲击峰），但 300+ 帧的安静站立里压力曲线
+# 逐帧在阈值上下抖动，连续段立刻断开——实测 341 帧里左脚只剩 2 帧、右脚只剩 1 帧，
+# 轨迹画不出来，椭圆也退化（短轴=0）。站立稳定性要看的是整段站立，不是某个峰。
+STANDING_MIN_CONTACT_RATIO = 0.2   # 相对该脚接触点数中位数
+STANDING_MIN_CONTACT_CELLS = 5     # 绝对下限，低于此无法得到稳定 COP
+
+
+def find_standing_contact_indexes(pressure_curve):
+    """返回该脚真正着地的所有帧下标（可不连续）。"""
+    counts = np.asarray(pressure_curve, dtype=float)
+    if counts.size == 0:
+        return []
+
+    loaded = counts[counts > 0]
+    if loaded.size == 0:
+        return []
+
+    # 用中位数而不是峰值做基准，避免单帧尖峰把阈值抬高。
+    threshold = max(
+        float(np.median(loaded)) * STANDING_MIN_CONTACT_RATIO,
+        STANDING_MIN_CONTACT_CELLS,
+    )
+    return [int(i) for i in np.flatnonzero(counts >= threshold)]
+
+
 def calculate_cop_corrected(pressure_grid, isRight):
     total_pressure = 0
     weighted_x = 0
@@ -365,22 +392,74 @@ def calculate_cop_corrected(pressure_grid, isRight):
     return cop_x, cop_y
 
 
-def calculate_cop_trajectories(df, left_curve, right_curve, threshold_ratio):
-    left_left_index, left_right_index = find_pressure_peak_interval(left_curve, threshold_ratio)
-    right_left_index, right_right_index = find_pressure_peak_interval(right_curve, threshold_ratio)
+# COP 低通滤波：轨迹长度和速度是对位置求差分得来的，会把逐帧抖动整个放大。
+# 本机 42fps、传感器间距 14mm，实测左脚帧间位移中位数 0.143 格 ≈ 2mm/帧，
+# 折算成 84mm/s 的"速度"，而这部分几乎全是量化噪声。
+#
+# 姿势图学惯例是 4 阶零相位 Butterworth（Schmid et al. 2002），但那套
+# 10Hz 截止是按 100Hz 采样定的；我们奈奎斯特只有 21Hz，10Hz 等于归一化
+# 0.48，基本不滤（实测速度仅从 131 降到 88 mm/s）。
+#
+# 改按本机信号的功率谱定截止：安静站立的 COP 能量集中在低频，实测干净一侧
+# 3Hz 以下占前后向 99%、左右向 94%。取 5Hz 既保住生理摆动，又能滤掉
+# 5~21Hz 那段噪声。必须零相位（filtfilt），单向滤波的相移会直接污染速度。
+STANDING_COP_FILTER_HZ = 5.0
+STANDING_COP_FILTER_ORDER = 4
+
+
+def smooth_standing_cop(trajectory, fps=42.0, cutoff_hz=STANDING_COP_FILTER_HZ,
+                        order=STANDING_COP_FILTER_ORDER):
+    """对 COP 轨迹做零相位低通。样本太少或截止频率不合法时原样返回。"""
+    points = np.asarray(trajectory, dtype=float)
+    if points.ndim != 2 or points.shape[0] < 2 or points.shape[1] < 2:
+        return trajectory
+    if not (fps > 0 and cutoff_hz > 0):
+        return trajectory
+
+    normalized_cutoff = cutoff_hz / (fps / 2.0)
+    if not 0 < normalized_cutoff < 1:
+        return trajectory
+
+    numerator, denominator = butter(order, normalized_cutoff, btype='low')
+    # filtfilt 双向各需要一段边缘数据做镜像填充，样本不够会直接抛错。
+    pad_length = 3 * (max(len(numerator), len(denominator)) - 1)
+    if points.shape[0] <= pad_length:
+        return trajectory
+
+    smoothed = np.column_stack([
+        filtfilt(numerator, denominator, points[:, 0]),
+        filtfilt(numerator, denominator, points[:, 1]),
+    ])
+    return [[float(x), float(y)] for x, y in smoothed]
+
+
+def calculate_cop_trajectories(df, left_curve, right_curve, threshold_ratio, fps=42.0):
+    """静止站立的左右脚 COP 轨迹，取整段着地期。
+
+    threshold_ratio 保留在签名里只为兼容既有调用方，取窗已改用
+    find_standing_contact_indexes（原因见该函数注释）。
+    """
     left_serial_matrix_cop = []
     right_serial_matrix_cop = []
-    for index in range(left_left_index, left_right_index + 1):
-        matrix = [df.iloc[index]['data'][i * 64:(i + 1) * 64] for i in range(64)]
-        left_matrix = [row[:32] for row in matrix]
-        leftIn, rightIn = calculate_cop_corrected(left_matrix, False)
-        left_serial_matrix_cop.append([leftIn, rightIn])
-    for index in range(right_left_index, right_right_index + 1):
-        matrix = [df.iloc[index]['data'][i * 64:(i + 1) * 64] for i in range(64)]
-        right_matrix = [row[32:] for row in matrix]
-        leftIn, rightIn = calculate_cop_corrected(right_matrix, True)
-        right_serial_matrix_cop.append([leftIn, rightIn])
-    return left_serial_matrix_cop, right_serial_matrix_cop
+    for curve, is_right, sink in (
+        (left_curve, False, left_serial_matrix_cop),
+        (right_curve, True, right_serial_matrix_cop),
+    ):
+        for index in find_standing_contact_indexes(curve):
+            matrix = [df.iloc[index]['data'][i * 64:(i + 1) * 64] for i in range(64)]
+            half = [row[32:] if is_right else row[:32] for row in matrix]
+            try:
+                cop_x, cop_y = calculate_cop_corrected(half, is_right)
+            except ValueError:
+                # 该帧这只脚没有压力：跳过这一帧即可，不该让整条轨迹作废。
+                continue
+            sink.append([cop_x, cop_y])
+    # 在源头统一滤波：画出来的轨迹与所有下游统计（cop_time_series、
+    # 置信椭圆）用的是同一条信号，图和数字不会互相矛盾。
+    return (
+        smooth_standing_cop(left_serial_matrix_cop, fps=fps),
+        smooth_standing_cop(right_serial_matrix_cop, fps=fps),
+    )
 
 
 # =============== 性能优化2：OpenCV 连通域替代 DFS（核心加速） ===============
@@ -1249,6 +1328,80 @@ def calculate_feet_centers_and_distances(df, left, right):
         "dist_left_to_both": dist_left * STANDING_SPACING_CM if dist_left is not None else None,
         "dist_right_to_both": dist_right * STANDING_SPACING_CM if dist_right is not None else None
     }
+
+
+def calculate_peak_frame_center_control(cop_results, spacing_cm=STANDING_SPACING_CM):
+    """Calculate a peak-frame plantar-COP offset proxy.
+
+    This is deliberately not a whole-body center-of-mass measurement.  The
+    bilateral COP is compared with the unweighted midpoint of the left and
+    right foot COPs from the same peak-pressure frame.
+    """
+    frame_index = cop_results.get("frame_index") if isinstance(cop_results, dict) else None
+    result = {
+        "scope": "peak_frame_plantar_cop_proxy",
+        "reference": "bilateral_foot_cop_midpoint",
+        "frame_index": frame_index,
+        "lateral_offset_cm": None,
+        "longitudinal_offset_cm": None,
+        "magnitude_cm": None,
+        "lateral_direction": None,
+        "quality": {
+            "valid": False,
+            "reason": "incomplete_peak_frame_cop",
+        },
+    }
+
+    def finite_point(value):
+        if not isinstance(value, (list, tuple, np.ndarray)):
+            return None
+        try:
+            point = np.asarray(value, dtype=float)
+        except (TypeError, ValueError):
+            return None
+        if point.shape != (2,) or not np.all(np.isfinite(point)):
+            return None
+        return point
+
+    if not isinstance(cop_results, dict):
+        return result
+
+    left_cop = finite_point(cop_results.get("left_cop"))
+    right_cop = finite_point(cop_results.get("right_cop"))
+    both_cop = finite_point(cop_results.get("both_cop"))
+    if left_cop is None or right_cop is None or both_cop is None:
+        return result
+
+    reference_point = (left_cop + right_cop) / 2.0
+    longitudinal_signed_cm = float(
+        (both_cop[0] - reference_point[0]) * spacing_cm
+    )
+    lateral_offset_cm = float(
+        (both_cop[1] - reference_point[1]) * spacing_cm
+    )
+    longitudinal_offset_cm = abs(longitudinal_signed_cm)
+
+    direction_tolerance_cm = 1e-9
+    if lateral_offset_cm > direction_tolerance_cm:
+        lateral_direction = "right"
+    elif lateral_offset_cm < -direction_tolerance_cm:
+        lateral_direction = "left"
+    else:
+        lateral_offset_cm = 0.0
+        lateral_direction = "centered"
+    magnitude_cm = math.hypot(lateral_offset_cm, longitudinal_offset_cm)
+
+    result.update({
+        "lateral_offset_cm": lateral_offset_cm,
+        "longitudinal_offset_cm": longitudinal_offset_cm,
+        "magnitude_cm": magnitude_cm,
+        "lateral_direction": lateral_direction,
+        "quality": {
+            "valid": True,
+            "reason": None,
+        },
+    })
+    return result
 
 
 def calculate_region_pressures(section_coords, matrix):
@@ -2286,7 +2439,7 @@ def cal_cop_fromData(data_array, threshold_ratio=0.8, fps=42, r_radius=0.1, time
     left_curve, right_curve = extract_pressure_curves(data_array)
 
     # COP轨迹
-    left_cop, right_cop = calculate_cop_trajectories(df, left_curve, right_curve, threshold_ratio)
+    left_cop, right_cop = calculate_cop_trajectories(df, left_curve, right_curve, threshold_ratio, fps=fps)
 
     # ✅ 足弓指标（使用总压力峰值帧）
     arch_results = calculate_complete_arch_features(data_array, left_curve, right_curve, False)
@@ -2318,6 +2471,7 @@ def cal_cop_fromData(data_array, threshold_ratio=0.8, fps=42, r_radius=0.1, time
 
     # ✅ 使用峰值帧计算COP中心
     cop_results = calculate_feet_centers_and_distances(df, left_curve, right_curve)
+    center_control = calculate_peak_frame_center_control(cop_results)
 
     # 尺寸（基于峰值帧的max_area）
     x_left_coords = [coord[0] for coord in left_max_area]
@@ -2355,6 +2509,7 @@ def cal_cop_fromData(data_array, threshold_ratio=0.8, fps=42, r_radius=0.1, time
         'arch_features': arch_results,
         'additional_data': additional_data,
         'cop_time_series': calculate_cop_time_series(left_cop, right_cop, additional_data),
+        'center_control': center_control,
     }
 
     # 控制台摘要
