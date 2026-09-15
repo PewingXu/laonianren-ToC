@@ -26,11 +26,23 @@ function footprintTrail(overrides = {}) {
   };
 }
 
+/*
+ * gaitParams 给齐评分所需的五个字段（walkingSpeed / left|rightStepTime /
+ * left|rightStepLength）。recoverGaitFootprintTrail 把「存量参数算不出评分」
+ * 也视为缺失并重跑；只给 walkingSpeed 的话，「字段齐全就不重跑」那条用例
+ * 会因为评分算不出而误触发重算。
+ */
 function legacyReport(reportData = {}) {
   return {
     completed: true,
     reportData: {
-      gaitParams: { walkingSpeed: 1.04 },
+      gaitParams: {
+        walkingSpeed: 1.04,
+        leftStepTime: 1.1,
+        rightStepTime: 1.08,
+        leftStepLength: 58.2,
+        rightStepLength: 57.6,
+      },
       score: 17,
       ...reportData,
     },

@@ -17,7 +17,7 @@
  * patientAge / patientWeight / institution / updatedAt / assessments.<type>.{completed,
  * assessmentId, report.reportData}），所以直接读取即可，无需字段映射。
  */
-import { getRecord, getHistory } from './historyService';
+import { getRecord, getHistory, patchAssessmentReportData } from './historyService';
 import { getRecordScores, getRankIncludingSelf, getCount } from './scoreRanking';
 import { enrichGripReportData, buildGripTrend } from './gripReportEnrich';
 import { enrichSitStandReportData } from './sitStandReportEnrich';
@@ -235,10 +235,35 @@ async function recoverGaitReportForRecord(report, record, {
   });
   if (recovered === report) return report;
 
+  /*
+   * 回填成功就落盘。
+   *
+   * 之前只在内存里合并，每次打开这份报告都要拿原始帧重跑一遍算法（几秒）。
+   * 现在把重算出来的字段写回 IndexedDB，下次直接读，不再重跑。
+   *
+   * 只写「这次真正补回来的键」，不动 reportData 里其它任何字段；
+   * 占位 id（pending:/local:/debug:）是内存态 gateway 的假记录，没有对应的
+   * 库记录，不写。写失败只打日志，不影响本次展示 —— 内存里的合并结果照常返回。
+   */
+  const before = report.reportData || {};
+  const after = recovered.reportData || {};
+  const patch = Object.fromEntries(
+    Object.keys(after).filter((key) => after[key] !== before[key]).map((key) => [key, after[key]]),
+  );
+  const recordId = record?.id;
+  const isRealRecord = typeof recordId === 'string'
+    ? !/^(pending|local|debug):/i.test(recordId)
+    : Number.isFinite(recordId);
+  if (isRealRecord && Object.keys(patch).length) {
+    patchAssessmentReportData(recordId, 'gait', patch).then((ok) => {
+      if (ok) console.info('[gait] 回填结果已落盘:', Object.keys(patch).join(', '));
+    });
+  }
+
   return {
     ...recovered,
     reportData: enrichReportData('gait', recovered.reportData, {
-      recordId: record?.id,
+      recordId,
       patient: patientOf(record),
     }),
   };

@@ -194,6 +194,38 @@ export async function updateAssessmentAiReport(recordId, assessmentType, aiRepor
 }
 
 /**
+ * 把回填算出来的字段写回某一项的 reportData。
+ *
+ * 用途：旧步态记录缺 footprintTrail / walkingStability / directionControl /
+ * 可评分的 gaitParams，打开时会用原始帧重跑算法补齐。之前只在内存里合并，
+ * 每次打开都要重算几秒；现在算好就落盘，下次直接读。
+ *
+ * 只写 patch 里给的键，不动其它字段；record 不存在或该项没做过就返回 false。
+ * 不更新 updatedAt —— 那是「检测时间」，回填不是重新检测。
+ */
+export async function patchAssessmentReportData(recordId, assessmentType, patch) {
+  if (!patch || typeof patch !== 'object' || !Object.keys(patch).length) return false;
+  try {
+    const record = await getRecord(recordId);
+    if (!record || !record.assessments?.[assessmentType]) return false;
+
+    const assessment = { ...record.assessments[assessmentType] };
+    const report = { ...(assessment.report || {}) };
+    report.reportData = { ...(report.reportData || {}), ...patch };
+    assessment.report = report;
+
+    await idbPut({
+      ...record,
+      assessments: { ...record.assessments, [assessmentType]: assessment },
+    });
+    return true;
+  } catch (e) {
+    console.error('回填结果落盘失败:', e);
+    return false;
+  }
+}
+
+/**
  * 删除一条记录（写墓碑，兼容删除源自 localStorage 的旧记录）
  */
 export async function deleteRecord(id) {

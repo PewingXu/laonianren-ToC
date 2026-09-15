@@ -1,3 +1,5 @@
+import { prepareGaitReportScoreInput } from './gaitReportEnrich.js';
+
 const gaitTrailPromiseCaches = new WeakMap();
 
 function isObject(value) {
@@ -179,6 +181,29 @@ async function requestRecomputedGaitData(client, {
       if (hasUsableDirectionControl(renderData.directionControl)) {
         result.directionControl = renderData.directionControl;
       }
+      /*
+       * gaitParams 也要带回去。下游 recoverGaitFootprintTrail 在存量参数算不出
+       * 评分时（旧算法给了 N/A）会用 recomputed.gaitParams 覆盖，但之前这里
+       * 只装了三个可视化字段，gaitParams 永远是 undefined —— 于是出现
+       * 「足印/稳定性/方向都补回来了，评分卡还是 --」。
+       * 只在新算法给出的参数能算出评分时才带，否则覆盖了也是白覆盖。
+       */
+      if (prepareGaitReportScoreInput({ gaitParams: renderData.gaitParams })) {
+        result.gaitParams = renderData.gaitParams;
+      }
+      /*
+       * 也带上重算后的 gaitParams。
+       *
+       * 旧版算法对 leftStepTime / rightStepTime 会给 'N/A'，而综合评分的门槛
+       * （gaitReportEnrich.hasCompleteScoreInputs）要求步速、左右步时、左右步长
+       * 五项都是正数。缺一项评分就是 null，首屏显示「-- 分」。
+       * 之前回填只补三个新区块、不碰 gaitParams，所以这类旧记录即便回填成功
+       * 也永远没有评分。这里只在重算结果能过评分门槛时才带出来，
+       * 由 recoverGaitFootprintTrail 决定要不要替换存量。
+       */
+      if (prepareGaitReportScoreInput({ gaitParams: renderData.gaitParams })) {
+        result.gaitParams = renderData.gaitParams;
+      }
       // The three contracts have different quality thresholds. Keep every
       // independently valid result instead of discarding the whole recompute
       // when one algorithm cannot produce a value for this recording.
@@ -214,7 +239,9 @@ export async function recoverGaitFootprintTrail(report, {
   const hasTrail = hasValidFootprintTrail(report.reportData.footprintTrail);
   const hasStability = hasUsableWalkingStability(report.reportData.walkingStability);
   const hasDirection = hasUsableDirectionControl(report.reportData.directionControl);
-  if (hasTrail && hasStability && hasDirection) return report;
+  // 存量 gaitParams 能不能算出综合评分。算不出（旧算法给了 N/A）也算「缺」，要重算
+  const hasScorableParams = Boolean(prepareGaitReportScoreInput(report.reportData));
+  if (hasTrail && hasStability && hasDirection && hasScorableParams) return report;
 
   const sourceAssessmentId = realAssessmentId(assessmentId)
     || realAssessmentId(fallbackAssessmentId);
@@ -237,6 +264,10 @@ export async function recoverGaitFootprintTrail(report, {
   }
   if (!hasDirection && recomputed.directionControl) {
     recoveredFields.directionControl = recomputed.directionControl;
+  }
+  // 只在存量算不出评分、且重算结果能算时才替换；存量本来就完整就不动它
+  if (!hasScorableParams && recomputed.gaitParams) {
+    recoveredFields.gaitParams = recomputed.gaitParams;
   }
   if (!Object.keys(recoveredFields).length) return report;
 
