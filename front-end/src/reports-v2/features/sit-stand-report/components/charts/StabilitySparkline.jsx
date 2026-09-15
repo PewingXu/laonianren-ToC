@@ -1,45 +1,38 @@
-function chartPoints(values) {
-  if (values.length === 0) return [];
-
-  const minimum = Math.min(...values);
-  const maximum = Math.max(...values);
-  const spread = maximum - minimum;
-  return values.map((value, index) => {
-    const x = values.length === 1 ? 110 : 14 + (193 * index) / (values.length - 1);
-    const y = spread === 0 ? 68 : 104 - ((value - minimum) / spread) * 72;
-    return { x: Math.round(x), y: Math.round(y) };
-  });
-}
-
+/**
+ * 起身稳定性：三根柱子，一次一根，柱高 = 这次耗时 / 最慢一次。
+ *
+ * 之前是一条需要正好 6 个点的折线，本系统只有 3 次周期，凑不满
+ * mapper 就丢弃 → 图表区一片空白。「稳定性」本来就是看三次快慢差多少，
+ * 三根高矮不一的柱子比一条趋势线更直接。
+ *
+ * 结构和样式照握力的 GripTrialBars（.grip-report__trial-bar），
+ * 柱顶标原始秒数而不是百分比 —— 老人看得懂「2.1 秒」，看不懂「87%」。
+ */
 export function StabilitySparkline({ metric }) {
-  const points = chartPoints(metric.chartValues);
-  const isRising = metric.chartValues.length > 1
-    && metric.chartValues.at(-1) > metric.chartValues[0];
+  const values = Array.isArray(metric.chartValues) ? metric.chartValues : [];
+  const labels = Array.isArray(metric.chartLabels) ? metric.chartLabels : [];
+  const seconds = Array.isArray(metric.chartSeconds) ? metric.chartSeconds : [];
   const label = metric.value === null
     ? '稳定性数据不足'
-    : `稳定性得分 ${metric.value} 分，${isRising ? '呈上升趋势' : '趋势平稳'}`;
+    : `稳定性得分 ${metric.value} 分`;
+
+  if (values.length === 0) {
+    return <div className="sit-stand-report__trial-bars" role="img" aria-label={label} />;
+  }
 
   return (
-    <svg
-      className="sit-stand-report__stability-chart"
-      viewBox="0 0 220 140"
-      role="img"
-      aria-label={label}
-    >
-      {points.length > 0 ? (
-        <>
-          <polyline
-            data-testid="stability-line"
-            data-values={metric.chartValues.join(',')}
-            points={points.map(({ x, y }) => `${x},${y}`).join(' ')}
-          />
-          <g>
-            {points.map(({ x, y }, index) => (
-              <circle key={`${x}-${y}-${index}`} cx={x} cy={y} r="4" />
-            ))}
-          </g>
-        </>
-      ) : null}
-    </svg>
+    <div className="sit-stand-report__trial-bars" role="img" aria-label={label}>
+      {values.map((value, index) => {
+        const height = `${Math.max(18, (value / 100) * 72)}px`;
+        const sec = seconds[index];
+        return (
+          <div className="sit-stand-report__trial-bar" key={labels[index] || index}>
+            <span>{Number.isFinite(sec) ? `${sec}s` : '--'}</span>
+            <i style={{ height }} aria-hidden="true" data-tone="orange" />
+            <small>{labels[index] || `第${index + 1}次`}</small>
+          </div>
+        );
+      })}
+    </div>
   );
 }

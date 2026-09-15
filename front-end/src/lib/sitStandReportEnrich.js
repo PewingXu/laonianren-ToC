@@ -108,9 +108,18 @@ function smoothnessBand(smoothness) {
 function balancePercents(symmetry) {
   if (!isObject(symmetry)) return { leftPercent: null, rightPercent: null };
 
-  // 算法若直接给了左右占比就用它（不同版本字段名不一）
-  const directLeft = toNumber(symmetry.left_percent ?? symmetry.leftPercent, null);
-  const directRight = toNumber(symmetry.right_percent ?? symmetry.rightPercent, null);
+  /*
+   * 算法在 symmetry 里直接给了左右脚的每帧平均力（N）：
+   *   generate_sit_stand_pdf_v3.py:2283  'left_avg_force' / 'right_avg_force'
+   * 之前只读 left_right_ratio（弱/强 × 100，不带方向），所以判不出哪边是左，
+   * 这张卡一直「数据不足」。有了两侧绝对力值，占比直接算。
+   */
+  const directLeft = toNumber(
+    symmetry.left_avg_force ?? symmetry.left_percent ?? symmetry.leftPercent, null,
+  );
+  const directRight = toNumber(
+    symmetry.right_avg_force ?? symmetry.right_percent ?? symmetry.rightPercent, null,
+  );
   if (directLeft !== null && directRight !== null) {
     const sum = directLeft + directRight;
     if (sum > 0) {
@@ -157,6 +166,18 @@ function stabilityBand(cv) {
   if (cv <= 10) return '每次都差不多';
   if (cv <= 25) return '快慢有点波动';
   return '一次比一次慢';
+}
+
+/**
+ * 三次周期耗时 → 以最慢一次为 100% 的柱高。
+ * 全部有效才返回，缺一次就不画（半截图表比没图表更误导）。
+ */
+function cycleBars(cycleDurations) {
+  if (!Array.isArray(cycleDurations) || cycleDurations.length === 0) return [];
+  const values = cycleDurations.map((v) => toNumber(v, null));
+  if (values.some((v) => v === null || v <= 0)) return [];
+  const slowest = Math.max(...values);
+  return values.map((v) => round(clamp((v / slowest) * 100, 0, 100), 0));
 }
 
 /* ════════════════════════════════════════════════
@@ -244,8 +265,15 @@ export function enrichSitStandReportData(reportData, { patientInfo } = {}) {
         ? '数据不足'
         : `每次起坐耗时上下差 ${stability.cv}%`,
       reference: { min: 75, max: 100, precision: 0 },
-      // 趋势要正好 6 点，本系统只有 3 次周期，凑不满就不给（mapper 会丢弃）
-      trend: [],
+      /*
+       * 三次起坐各用了多久，按最慢一次 = 100% 归一化。
+       * 「稳定性」说的就是这三次快慢差多少，直接把三根柱子画出来，
+       * 读者一眼看到哪次慢了 —— 比一条空的趋势线有信息量。
+       * mapper 的 percentArray 是 slice(0, n) 再校验每项，3 个点能通过。
+       */
+      trend: cycleBars(cycles),
+      trendSeconds: cycles.map((v) => round(v, 1)),
+      trendLabels: cycles.length ? cycles.map((_, i) => `第${['一', '二', '三', '四', '五', '六'][i] || i + 1}次`) : [],
     },
     completion: {
       // 完成度 = 实际完成次数 / 要求的 3 次
@@ -255,7 +283,12 @@ export function enrichSitStandReportData(reportData, { patientInfo } = {}) {
       // rangeOrNull 要求 min < max，不能写 {100,100}（会被判无效显示「数据不足」）。
       // 用「完成 3 次即 100%」的区间表达：低于 100% 就是没做满。
       reference: { min: 99, max: 100, precision: 0 },
-      bars: [],
+      /*
+       * 一次一根柱，要求的 3 次全画出来：做完的 100、没做的 0。
+       * 只做了 2 次就是两根满柱一根空柱，比光写「67%」直观。
+       */
+      bars: [0, 1, 2].map((i) => (i < m.numCycles ? 100 : 0)),
+      barLabels: ['第一次', '第二次', '第三次'],
     },
   };
 

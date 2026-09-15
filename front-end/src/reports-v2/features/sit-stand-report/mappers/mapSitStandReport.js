@@ -191,6 +191,13 @@ function percentArray(value, maximumLength) {
   return values.length > 0 && values.every((item) => item !== null) ? values : [];
 }
 
+/** 同 percentArray 的宽松版：截到 maximumLength，每项须为正数，否则整段为空 */
+function positiveList(value, maximumLength) {
+  if (!Array.isArray(value)) return [];
+  const values = value.slice(0, maximumLength).map(positiveOrNull);
+  return values.length > 0 && values.every((item) => item !== null) ? values : [];
+}
+
 function positiveArray(value, expectedLength) {
   if (!Array.isArray(value) || value.length !== expectedLength) return [];
 
@@ -356,6 +363,11 @@ function buildMetrics(data, averageDuration) {
       summary: stabilityScore === null ? '数据不足' : textOr(stability.summary, '数据不足'),
       reference: rangeCopy(stabilityReference, '分'),
       chartValues: stabilityScore === null ? [] : percentArray(stability.trend, 6),
+      chartLabels: stabilityScore === null ? [] : textArray(stability.trendLabels, 6),
+      // 每根柱对应的原始秒数，图上要标出来给人读
+      // 用 slice 语义的 positiveList 而不是 positiveArray：后者要求长度**正好**等于 n，
+      // 3 次周期给 6 会被整段丢弃；这里的柱数就是周期数，和上一行的 percentArray 同口径
+      chartSeconds: stabilityScore === null ? [] : positiveList(stability.trendSeconds, 6),
       detailTargetId: 'sit-stand-stability-detail',
     },
     {
@@ -368,6 +380,7 @@ function buildMetrics(data, averageDuration) {
       summary: completionPercent === null ? '数据不足' : textOr(completion.summary, '数据不足'),
       reference: rangeCopy(completionReference, '%'),
       chartValues: completionPercent === null ? [] : percentArray(completion.bars, 5),
+      chartLabels: completionPercent === null ? [] : textArray(completion.barLabels, 5),
       detailTargetId: 'sit-stand-details-title',
     },
   ];

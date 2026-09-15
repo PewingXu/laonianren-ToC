@@ -541,128 +541,166 @@ body:has(.sit-stand-report) {
   margin: 0;
 }
 
-/* 图表容器：占满 grid 的 1fr 行，图表自身宽度撑满 */
-.sit-stand-report__speed-gauge,
-.sit-stand-report__balance-visual,
-.sit-stand-report__stability-chart,
-.sit-stand-report__completion-chart {
-  width: 100%;
-  margin-top: 0;
-}
+/* ════════════════════════════════════════════════
+   指标卡内的四张图 —— 尺寸、字号照握力（grip-report.css 的
+   __gauge / __trial-bars），高度统一 96px，四张卡的图表区落在同一条线上。
+   ════════════════════════════════════════════════ */
 
-.sit-stand-report__speed-gauge {
-  height: 120px;
-  overflow: visible;
-}
-
-.sit-stand-report__stability-chart,
-.sit-stand-report__completion-chart {
-  height: 110px;
-}
-
-.sit-stand-report__split-score {
-  display: grid;
-  min-height: 66px;
-  grid-template-columns: auto auto auto 52px;
-  align-items: center;
-  justify-content: space-between;
-  column-gap: 1px;
-  margin-top: 8px;
-}
-
-.sit-stand-report__split-score span {
-  color: var(--sit-blue);
-  font-size: 12px;
-  white-space: nowrap;
-}
-
-.sit-stand-report__split-score span:nth-of-type(2) {
-  color: var(--sit-muted);
-}
-
-.sit-stand-report__split-score b {
-  display: inline-block;
-  margin-left: 2px;
-  color: var(--sit-blue);
-  font-family: Arial, sans-serif;
-  font-size: 21px;
-}
-
-.sit-stand-report__split-score i {
-  color: var(--sit-line);
-  font-style: normal;
-}
-
-.sit-stand-report__split-score em {
-  min-width: 52px;
-  margin: 0;
-  font-size: 11px;
-}
-
-.sit-stand-report__balance-labels {
+/* 起身速度：180° 圆弧 + 四档标签（照 .grip-report__gauge） */
+.sit-stand-report__gauge {
   display: flex;
+  width: 100%;
+  height: 96px;
+  flex-direction: column;
+  align-items: center;
+}
+
+.sit-stand-report__gauge svg {
+  width: 160px;
+  height: 80px;
+}
+
+.sit-stand-report__gauge > div {
+  display: flex;
+  width: 160px;
   justify-content: space-between;
-  margin-top: 31px;
+  margin-top: 4px;
   color: var(--sit-muted);
   font-size: 10px;
 }
 
-.sit-stand-report__balance-labels span:first-child {
-  color: var(--sit-blue);
+.sit-stand-report__gauge strong {
+  color: var(--sit-green);
 }
 
+/* 稳定性 / 完成度：三根柱（照 .grip-report__trial-bars） */
+.sit-stand-report__trial-bars {
+  display: flex;
+  width: 100%;
+  height: 96px;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 16px;
+}
+
+.sit-stand-report__trial-bar {
+  display: flex;
+  height: 96px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+}
+
+.sit-stand-report__trial-bar span {
+  color: var(--sit-text);
+  font-size: 11px;
+  line-height: 14px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.sit-stand-report__trial-bar small {
+  color: var(--sit-muted);
+  font-size: 10px;
+  line-height: 12px;
+}
+
+.sit-stand-report__trial-bar i {
+  width: 24px;
+  border-radius: 2px 2px 0 0;
+  background: rgba(125, 168, 216, 0.65);
+}
+
+.sit-stand-report__trial-bar i[data-tone="orange"] {
+  background: rgba(248, 163, 109, 0.75);
+}
+
+.sit-stand-report__trial-bar i[data-tone="purple"] {
+  background: rgba(166, 137, 181, 0.75);
+}
+
+/* 没做的那次：只留一个浅底座，不填色 */
+.sit-stand-report__trial-bar i[data-tone="empty"] {
+  background: var(--sit-line);
+}
+
+/* 双脚发力平衡：左脚 ── 对分条 ── 右脚 */
+.sit-stand-report__balance {
+  display: grid;
+  width: 100%;
+  height: 96px;
+  grid-template-columns: 44px minmax(0, 1fr) 44px;
+  align-items: center;
+  column-gap: 10px;
+}
+
+.sit-stand-report__balance-side {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.sit-stand-report__balance-side svg {
+  width: 26px;
+  height: 40px;
+}
+
+.sit-stand-report__balance-side[data-side="left"] svg { fill: var(--sit-blue); }
+.sit-stand-report__balance-side[data-side="right"] svg { fill: var(--sit-orange); }
+
+.sit-stand-report__balance-side b {
+  font-size: 13px;
+  line-height: 16px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.sit-stand-report__balance-side[data-side="left"] b { color: var(--sit-blue); }
+.sit-stand-report__balance-side[data-side="right"] b { color: var(--sit-orange); }
+
+.sit-stand-report__balance-side small {
+  color: var(--sit-muted);
+  font-size: 10px;
+  line-height: 12px;
+}
+
+/*
+ * 对分条：flex 横排两段填色，各占自己的百分比，天然从中间分开。
+ * 中线用绝对定位的 1px 竖线压在 50% 处，是不动的参照。
+ */
 .sit-stand-report__balance-track {
+  position: relative;
   display: flex;
   height: 14px;
   overflow: hidden;
-  margin-top: 9px;
   border-radius: 999px;
   background: var(--sit-line);
 }
 
-.sit-stand-report__balance-track span {
-  background: linear-gradient(90deg, #7da8d8, #b9cee6);
+.sit-stand-report__balance-fill {
+  display: block;
+  height: 100%;
+  transition: width 0.3s ease;
 }
 
-.sit-stand-report__balance-track i {
-  background: linear-gradient(90deg, #fad0b5, #f8a36d);
+.sit-stand-report__balance-fill[data-side="left"] {
+  background: linear-gradient(90deg, #b9cee6, var(--sit-blue));
 }
 
-.sit-stand-report__feet-row {
-  display: flex;
-  justify-content: space-between;
-  padding: 8px 4px 0;
+.sit-stand-report__balance-fill[data-side="right"] {
+  background: linear-gradient(90deg, var(--sit-orange), #fad0b5);
 }
 
-.sit-stand-report__feet-row svg {
-  width: 30px;
-  height: 46px;
-}
-
-.sit-stand-report__feet-row svg:first-child {
-  fill: #c7d9ec;
-}
-
-.sit-stand-report__feet-row svg:last-child {
-  fill: #fad0b5;
-}
-
-.sit-stand-report__stability-chart polyline {
-  fill: none;
-  stroke: var(--sit-orange);
-  stroke-width: 1.8;
-  stroke-linejoin: round;
-  stroke-linecap: round;
-}
-
-.sit-stand-report__stability-chart circle {
-  fill: #fff;
-  stroke: var(--sit-orange);
-  stroke-width: 1.8;
-}
-
-.sit-stand-report__completion-chart rect {
-  fill: url(#sitStandCompletionBars);
+.sit-stand-report__balance-midline {
+  position: absolute;
+  top: -2px;
+  bottom: -2px;
+  left: 50%;
+  width: 2px;
+  margin-left: -1px;
+  background: var(--sit-panel);
 }
 
 /* ════════════════════════════════════════════════
